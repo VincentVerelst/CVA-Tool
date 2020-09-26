@@ -1,18 +1,25 @@
 import numpy as np 
 import pandas as pd 
-
+import riskdrivers
 
 #Import everything
-CurrencyAmount = 4
 
-IRcols = [i for i in range(1,CurrencyAmount+1)] #Skip first column and only input columns with data
-FXcols = [i for i in range(1,CurrencyAmount)] #Skip first column and only input columns with data
 
-IRinput = pd.read_excel(r'IRinput.xlsx', usecols=IRcols)
-FXinput = pd.read_excel(r'FXinput.xlsx', usecols=FXcols)
-Correlationmatrix = pd.read_excel(r'correlationmatrix.xlsx', header=None,skiprows=1)
+
+IRinput = pd.read_excel(r'Runfiles/IRinput.xlsx')
+IRinput = IRinput.dropna(1) #Drops all columns with NA values
+IRinput = IRinput.drop(IRinput.columns[0], axis=1) #Drops first column
+
+FXinput = pd.read_excel(r'Runfiles/FXinput.xlsx')
+FXinput = FXinput.dropna(1) #Drops all columns with NA values
+FXinput = FXinput.drop(FXinput.columns[0], axis=1) #Drops first column
+
+Correlationmatrix = pd.read_excel(r'Input/Correlation/correlationmatrix.xlsx', header=None,skiprows=1)
 Correlationmatrix = Correlationmatrix.drop(Correlationmatrix.columns[0], axis=1)
-Correlationmatrix = Correlationmatrix.values
+Correlationmatrix = Correlationmatrix.values #Convert to numpy array (matrix)
 
-Choleskycorr = np.linalg.cholesky(Correlationmatrix)
-print(Choleskycorr)
+
+print(FXinput)
+
+
+#Choleskycorr = np.linalg.cholesky(Correlationmatrix)
