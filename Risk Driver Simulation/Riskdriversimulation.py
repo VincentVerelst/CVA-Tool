@@ -4,9 +4,12 @@ import datetime
 import math
 import QuantLib as ql #Requires "pip install QuantLib" in Anaconda prompt
 import yearfrac as yf #Requires "pip install yearfrac" in Anaconda prompt
-from hullwhiteblackscholes import HullWhiteBlackScholes
+from riskdrivers import *
+from generalfunctions import *
 
-#Import everything
+#############################################################################
+########## READ IN ALL INFOMRATION ############
+#############################################################################
 
 #Monte Carlo Information
 mcinput = pd.read_excel(r'Runfiles/MCDetails.xlsx')
@@ -26,11 +29,13 @@ maturity_yearfrac = yf.yearfrac(valuation_date, end_date)
 timegrid = np.arange(0, yf.yearfrac(valuation_date, end_date), step=switcher[timesteps])
 if maturity_yearfrac not in timegrid:
 	timegrid = np.append(timegrid, maturity_yearfrac)
+
 #Read in rates
 irinput = pd.read_excel(r'Runfiles/IRinput.xlsx')
 irinput = irinput.dropna(1) #Drops all columns with NA values
 irinput = irinput.drop(irinput.columns[0], axis=1) #Drops first column
 currencyamount = irinput.count(1)[0] #Count the amount of currencies
+
 
 #Read in FX
 fxinput = pd.read_excel(r'Runfiles/FXinput.xlsx')
@@ -59,8 +64,11 @@ if(num_rows != 2*total-1 or num_cols != 2*total-1):
 	print("Error: enter correlation matrix with correct dimensions: (2n-1)x(2n-1), with n = amount of risk drivers")
 	exit()
 
-hwbs = HullWhiteBlackScholes(irinput, fxinput, inflationinput, equityinput, correlationmatrix, simulation_amount, timegrid)
+
+irdrivers, fxdrivers, inflationdrivers, equitydrivers = create_riskdrivers(irinput, fxinput, inflationinput, equityinput)
+
+#hwbs = HullWhiteBlackScholes(irinput, fxinput, inflationinput, equityinput, correlationmatrix, simulation_amount, timegrid)
 
 
-
+print(irdrivers[0].get_meanreversion())
 #Choleskycorr = np.linalg.cholesky(Correlationmatrix)
