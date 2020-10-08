@@ -34,13 +34,17 @@ if maturity_yearfrac not in timegrid:
 irinput = pd.read_excel(r'Runfiles/IRinput.xlsx')
 irinput = irinput.dropna(1) #Drops all columns with NA values
 irinput = irinput.drop(irinput.columns[0], axis=1) #Drops first column
-currencyamount = irinput.count(1)[0] #Count the amount of currencies
+iramount = irinput.count(1)[0] #Count the amount of currencies
 
 
 #Read in FX
 fxinput = pd.read_excel(r'Runfiles/FXinput.xlsx')
 fxinput = fxinput.dropna(1) #Drops all columns with NA values
 fxinput = fxinput.drop(fxinput.columns[0], axis=1) #Drops first column
+fxamount = fxinput.count(1)[0] #Count the amount of currencies
+if(fxamount != iramount - 1):
+	print("Error: amount of FX rates must be one less than amount of interest rates.")
+	exit()
 
 #Read in inflation (which is a combo of rates and FX)
 inflationinput = pd.read_excel(r'Runfiles/InflationInput.xlsx')
@@ -58,17 +62,21 @@ correlationmatrix = correlationmatrix.drop(correlationmatrix.columns[0], axis=1)
 correlationmatrix = correlationmatrix.values #Convert to numpy array (matrix)
 
 num_rows, num_cols = correlationmatrix.shape
-total = currencyamount + inflationamount + equityamount
+total = iramount + fxamount + inflationamount + equityamount 
 #Check if dimensions of correlation matrix are correct
-if(num_rows != 2*total-1 or num_cols != 2*total-1):
+if(num_rows != total or num_cols != total): 
 	print("Error: enter correlation matrix with correct dimensions: (2n-1)x(2n-1), with n = amount of risk drivers")
 	exit()
 
 
 irdrivers, fxdrivers, inflationdrivers, equitydrivers = create_riskdrivers(irinput, fxinput, inflationinput, equityinput)
 
-#hwbs = HullWhiteBlackScholes(irinput, fxinput, inflationinput, equityinput, correlationmatrix, simulation_amount, timegrid)
 
+chol, rand_matrices = mc_simulate_hwbs(irdrivers, fxdrivers, inflationdrivers, equitydrivers, correlationmatrix, timegrid, simulation_amount)
 
-print(irdrivers[0].get_meanreversion())
-#Choleskycorr = np.linalg.cholesky(Correlationmatrix)
+x = rand_matrices[0]
+y = rand_matrices[1]
+
+xmean = np.mean(x, axis=0)
+ymean = np.mean(y, axis = 0)
+

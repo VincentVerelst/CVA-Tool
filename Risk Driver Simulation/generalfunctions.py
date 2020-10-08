@@ -51,3 +51,31 @@ def create_riskdrivers(irinput, fxinput, inflationinput, equityinput):
 		equitydrivers.append(equitydriver)
 
 	return(irdrivers, fxdrivers, inflationdrivers, equitydrivers)
+
+
+def mc_simulate_hwbs(irdrivers, fxdrivers, inflationdrivers, equitydrivers, correlationmatrix, timegrid, simulation_amount):
+	#Count riskdrivers
+	n_irdrivers = len(irdrivers)
+	n_fxdrivers = len(fxdrivers)
+	n_inflationdrivers = len(inflationdrivers)
+	n_equitydrivers = len(equitydrivers)
+	n_totaldrivers = n_irdrivers + n_fxdrivers + n_inflationdrivers + n_equitydrivers
+
+	#Generate antithetic correlated random paths using cholesky decomposition
+	cholesky_correlationmatrix = np.linalg.cholesky(correlationmatrix)
+	#Generate random independent matrices with antithetic paths
+	random_matrices = []
+	for i in range(0, n_totaldrivers):
+		rand_matrix = np.random.rand(int(simulation_amount / 2),  len(timegrid))
+		rand_matrix = np.concatenate((rand_matrix, -rand_matrix)) #antithetic paths
+		random_matrices.append(rand_matrix)
+
+	#Correlate the independent matrices with cholesky decomp
+	correlated_random_matrices = []
+	for i in range(0, n_totaldrivers):
+		rand_matrix = np.zeros((simulation_amount, len(timegrid)))
+		for j in range(0, n_totaldrivers):
+			rand_matrix += random_matrices[j] * cholesky_correlationmatrix[i][j]
+		correlated_random_matrices.append(rand_matrix)
+
+	return(cholesky_correlationmatrix, correlated_random_matrices)
