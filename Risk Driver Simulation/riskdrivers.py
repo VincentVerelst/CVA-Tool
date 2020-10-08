@@ -31,6 +31,9 @@ class RatesDriver:
 	def get_meanreversion(self):
 		return self.meanreversion
 
+	def get_firstshortrate(self):
+		return self.yieldcurve['ZeroRate'][1] #First short rate approximated with first nonzero zero rate
+
 
 class FXDriver:
 	def __init__(self, name, spotfx, volatility):

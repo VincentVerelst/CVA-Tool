@@ -74,9 +74,6 @@ irdrivers, fxdrivers, inflationdrivers, equitydrivers = create_riskdrivers(irinp
 
 chol, rand_matrices = mc_simulate_hwbs(irdrivers, fxdrivers, inflationdrivers, equitydrivers, correlationmatrix, timegrid, simulation_amount)
 
-x = rand_matrices[0]
-y = rand_matrices[1]
+shortrates = hullwhite_simulate(timegrid, simulation_amount, rand_matrices[0], irdrivers[0].get_yield(timegrid), irdrivers[0].get_volatility(timegrid), irdrivers[0].get_meanreversion(), irdrivers[0].get_firstshortrate())
 
-xmean = np.mean(x, axis=0)
-ymean = np.mean(y, axis = 0)
-
+print(shortrates)

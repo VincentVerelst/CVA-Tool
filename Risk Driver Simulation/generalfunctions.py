@@ -52,6 +52,18 @@ def create_riskdrivers(irinput, fxinput, inflationinput, equityinput):
 
 	return(irdrivers, fxdrivers, inflationdrivers, equitydrivers)
 
+def hullwhite_simulate(timegrid, simulation_amount, random_matrix, zerorates, volatility, alpha, firstshortrate):
+	deltaT = timegrid[2] - timegrid[1] #determine time intervals of timegrid
+	#Calculate the deterministic beta factors (we simulate x(t) = r(t) - beta(t)), with x(t) Orstein-Uhlenbeck process
+	#Calculate instantaneous forward rates
+	discount_factors = np.power((1 + zerorates), -timegrid) #convert zero rates into discount factors
+	instantaneous_forward_rates = (discount_factors[0:(len(discount_factors)-1)] / discount_factors[1:len(discount_factors)] - 1) / deltaT #Approximate intstan. fwd rates with standard forward rates
+	instantaneous_forward_rates = np.append(np.array(firstshortrate), instantaneous_forward_rates) #Approximate first inst fwd rate (= first short rate) with first zero rate
+
+	beta = instantaneous_forward_rates + (np.power(volatility,2) / (np.power(alpha,2))) * np.power(1 - np.exp(-alpha*timegrid),2)
+
+	return(beta)
+
 
 def mc_simulate_hwbs(irdrivers, fxdrivers, inflationdrivers, equitydrivers, correlationmatrix, timegrid, simulation_amount):
 	#Count riskdrivers
@@ -79,3 +91,4 @@ def mc_simulate_hwbs(irdrivers, fxdrivers, inflationdrivers, equitydrivers, corr
 		correlated_random_matrices.append(rand_matrix)
 
 	return(cholesky_correlationmatrix, correlated_random_matrices)
+
