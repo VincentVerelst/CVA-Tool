@@ -34,7 +34,17 @@ class RatesDriver:
 	def get_firstshortrate(self):
 		return self.yieldcurve['ZeroRate'][1] #First short rate approximated with first nonzero zero rate
 
+	def get_inst_fwd_rates(self, times):
+		self.deltaT = times[1] - times[0] #determine time intervals of timegrid
+		self.discount_factors = np.power(1 + self.get_yield(times), -times)
+		self.instantaneous_forward_rates = (self.discount_factors[0:(len(self.discount_factors)-1)] / self.discount_factors[1:len(self.discount_factors)] - 1) / self.deltaT #Approximate intstan. fwd rates with standard forward rates
+		self.instantaneous_forward_rates = np.append(np.array(self.get_firstshortrate()), self.instantaneous_forward_rates) #Approximate first inst fwd rate (= first short rate) with first zero rate
+		return self.instantaneous_forward_rates
 
+	def get_beta(self, times):
+		self.beta = self.get_inst_fwd_rates(times) + (np.power(self.get_volatility(times),2) / (np.power(self.get_meanreversion(),2))) * np.power(1 - np.exp(-self.get_meanreversion()*times),2)
+		return self.beta 
+		
 class FXDriver:
 	def __init__(self, name, spotfx, volatility):
 		self.name = name

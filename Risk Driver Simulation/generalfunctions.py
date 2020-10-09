@@ -52,17 +52,28 @@ def create_riskdrivers(irinput, fxinput, inflationinput, equityinput):
 
 	return(irdrivers, fxdrivers, inflationdrivers, equitydrivers)
 
-def hullwhite_simulate(timegrid, simulation_amount, random_matrix, zerorates, volatility, alpha, firstshortrate):
+
+def ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxdrivers, random_matrices, correlationmatrix):
+	simulated_shortrates = []
+	simulated_fxrates = []
+
 	deltaT = timegrid[2] - timegrid[1] #determine time intervals of timegrid
-	#Calculate the deterministic beta factors (we simulate x(t) = r(t) - beta(t)), with x(t) Orstein-Uhlenbeck process
-	#Calculate instantaneous forward rates
-	discount_factors = np.power((1 + zerorates), -timegrid) #convert zero rates into discount factors
-	instantaneous_forward_rates = (discount_factors[0:(len(discount_factors)-1)] / discount_factors[1:len(discount_factors)] - 1) / deltaT #Approximate intstan. fwd rates with standard forward rates
-	instantaneous_forward_rates = np.append(np.array(firstshortrate), instantaneous_forward_rates) #Approximate first inst fwd rate (= first short rate) with first zero rate
+	n_irdrivers = len(irdrivers)
+	n_fxdrivers = len(fxdrivers)
 
-	beta = instantaneous_forward_rates + (np.power(volatility,2) / (np.power(alpha,2))) * np.power(1 - np.exp(-alpha*timegrid),2)
+	#Calculate deterministic beta factors so that r(t) = x(t) + beta(t), with x(t) ornstein uhlenbeck process
+	betas = []
+	for i in range(0,len(irdrivers)):
+		beta = irdrivers[i].get_beta(timegrid)
+		betas.append(beta)
+		
+	#Simulate domestic short rate (OU)
+	domestic_ou = np.zeros((simulation_amount, len(timegrid)))
+	for i in range(0, len(timegrid) - 1):
+		#Exact solution scheme for x(t)
+		domestic_ou[:,i+1] = domestic_ou[:,i] * np.exp(- irdrivers[0].get_meanreversion() * deltaT) + irdrivers[0].get_volatility(timegrid[i+1]) * random_matrices[0][:,i] * np.sqrt((1 - np.exp(-2 * irdrivers[0].get_meanreversion() * deltaT))/(2 * irdrivers[0].get_meanreversion()))
+	return(domestic_ou)
 
-	return(beta)
 
 
 def mc_simulate_hwbs(irdrivers, fxdrivers, inflationdrivers, equitydrivers, correlationmatrix, timegrid, simulation_amount):
