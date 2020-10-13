@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd 
 import datetime
 import math
+import matplotlib.pyplot as plt
 import QuantLib as ql #Requires "pip install QuantLib" in Anaconda prompt
 import yearfrac as yf #Requires "pip install yearfrac" in Anaconda prompt
 from riskdrivers import *
@@ -15,6 +16,7 @@ from generalfunctions import *
 mcinput = pd.read_excel(r'Runfiles/MCDetails.xlsx')
 valuation_date = mcinput['Valuation Date'][0]
 end_date = mcinput['End Date Netting Set'][0]
+correlation = mcinput['Correlation'][0]
 timesteps = mcinput['Timesteps'][0]
 simulation_amount = mcinput['SimAmount'][0]
 switcher = {
@@ -57,7 +59,7 @@ equityinput = equityinput.drop(equityinput.columns[0], axis=1) #Drops first colu
 equityinput = equityinput.dropna(1) #Drops all columns with NA values
 equityamount = equityinput.count(1)[0] #Count the amount of currencies
 
-correlationmatrix = pd.read_excel(r'Input/Correlation/correlationmatrix.xlsx', header=None,skiprows=1)
+correlationmatrix = pd.read_excel(r'Input/Correlation/' + correlation +  '.xlsx', header=None,skiprows=1)
 correlationmatrix = correlationmatrix.drop(correlationmatrix.columns[0], axis=1)
 correlationmatrix = correlationmatrix.values #Convert to numpy array (matrix)
 
@@ -74,5 +76,12 @@ irdrivers, fxdrivers, inflationdrivers, equitydrivers = create_riskdrivers(irinp
 
 chol, rand_matrices = mc_simulate_hwbs(irdrivers, fxdrivers, inflationdrivers, equitydrivers, correlationmatrix, timegrid, simulation_amount)
 
-shortrates = ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxdrivers, rand_matrices, correlationmatrix)
-print(shortrates[:,1])
+shortrates, fxrates = ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxdrivers, rand_matrices, correlationmatrix)
+
+
+avgdomrate = np.mean(shortrates[0], axis=0)
+avgforrate = np.mean(shortrates[1], axis=0)
+avgfxrate = np.mean(fxrates[0], axis=0)
+
+plt.plot(timegrid, avgfxrate)
+plt.show()

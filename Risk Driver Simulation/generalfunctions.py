@@ -57,7 +57,8 @@ def ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxdrivers, random_mat
 	simulated_shortrates = []
 	simulated_fxrates = []
 
-	deltaT = timegrid[2] - timegrid[1] #determine time intervals of timegrid
+	deltaT = np.diff(timegrid)
+	#deltaT = timegrid[2] - timegrid[1] #determine time intervals of timegrid
 	n_irdrivers = len(irdrivers)
 	n_fxdrivers = len(fxdrivers)
 
@@ -67,12 +68,41 @@ def ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxdrivers, random_mat
 		beta = irdrivers[i].get_beta(timegrid)
 		betas.append(beta)
 		
+	#Simulate the short rates
+	short_rates = []
 	#Simulate domestic short rate (OU)
 	domestic_ou = np.zeros((simulation_amount, len(timegrid)))
+	domestic_short_rates = np.zeros((simulation_amount, len(timegrid)))
+	domestic_short_rates[:,0] = betas[0][0]
 	for i in range(0, len(timegrid) - 1):
 		#Exact solution scheme for x(t)
-		domestic_ou[:,i+1] = domestic_ou[:,i] * np.exp(- irdrivers[0].get_meanreversion() * deltaT) + irdrivers[0].get_volatility(timegrid[i+1]) * random_matrices[0][:,i] * np.sqrt((1 - np.exp(-2 * irdrivers[0].get_meanreversion() * deltaT))/(2 * irdrivers[0].get_meanreversion()))
-	return(domestic_ou)
+		domestic_ou[:,i+1] = domestic_ou[:,i] * np.exp(- irdrivers[0].get_meanreversion() * deltaT[i]) + irdrivers[0].get_volatility(timegrid[i+1]) * random_matrices[0][:,i] * np.sqrt((1 - np.exp(-2 * irdrivers[0].get_meanreversion() * deltaT[i]))/(2 * irdrivers[0].get_meanreversion()))
+		domestic_short_rates[:, i+1] = domestic_ou[:,i+1] + betas[0][i+1]
+
+	short_rates.append(domestic_short_rates)
+	#Simulate foreign short rate (OU)
+	for j in range(1, n_irdrivers):
+		foreign_ou = np.zeros((simulation_amount, len(timegrid)))
+		foreign_short_rates = np.zeros((simulation_amount, len(timegrid)))
+		foreign_short_rates[:,0] = betas[j][0]
+		for i in range(0, len(timegrid) - 1):
+			#Exact solution scheme for x(t)
+			foreign_ou[:,i+1] = foreign_ou[:,i] * np.exp(- irdrivers[j].get_meanreversion() * deltaT[i]) + (irdrivers[j].get_volatility(timegrid[i+1]) * fxdrivers[j-1].get_volatility(timegrid[i+1]) * correlationmatrix[j][n_irdrivers + j - 1]/irdrivers[j].get_meanreversion()) * (np.exp(- irdrivers[j].get_meanreversion() * deltaT[i]) - 1) + irdrivers[j].get_volatility(timegrid[i+1]) * random_matrices[j][:,i] * np.sqrt((1 - np.exp(-2 * irdrivers[j].get_meanreversion() * deltaT[i]))/(2 * irdrivers[j].get_meanreversion()))
+			foreign_short_rates[:, i+1] = foreign_ou[:,i+1] + betas[j][i+1]
+		short_rates.append(foreign_short_rates)
+	
+	
+	#simulate the spot FX rates
+	fxspot_rates = []
+	for j in range(0, n_fxdrivers):
+		spotfx = np.zeros((simulation_amount, len(timegrid)))
+		spotfx[:,0] = fxdrivers[j].get_spotfx() 
+		for i in range(0, len(timegrid) - 1):
+			spotfx[:,i+1] = spotfx[:,i] + spotfx[:,i] * ( (short_rates[0][:,i+1] - short_rates[j+1][:,i+1]) * deltaT[i] + fxdrivers[j].get_volatility(timegrid[i+1]) * np.sqrt(deltaT[i]) * random_matrices[n_irdrivers + j][:,i] )
+
+		fxspot_rates.append(spotfx)
+	
+	return(short_rates, fxspot_rates)
 
 
 
@@ -89,7 +119,7 @@ def mc_simulate_hwbs(irdrivers, fxdrivers, inflationdrivers, equitydrivers, corr
 	#Generate random independent matrices with antithetic paths
 	random_matrices = []
 	for i in range(0, n_totaldrivers):
-		rand_matrix = np.random.rand(int(simulation_amount / 2),  len(timegrid))
+		rand_matrix = np.random.randn(int(simulation_amount / 2),  len(timegrid))
 		rand_matrix = np.concatenate((rand_matrix, -rand_matrix)) #antithetic paths
 		random_matrices.append(rand_matrix)
 

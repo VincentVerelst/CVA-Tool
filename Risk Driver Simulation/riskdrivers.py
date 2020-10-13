@@ -15,7 +15,7 @@ class RatesDriver:
 		self.name = name
 		self.volatility = volatility
 		self.yieldcurve = yieldcurve
-		self.volatilityfun = interpolate.interp1d(self.volatility['TimeToZero'], self.volatility['sigma'], 'zero', fill_value='extrapolate') #piecewise constant interpolation of the volatility
+		self.volatilityfun = interpolate.interp1d(self.volatility['TimeToZero'], self.volatility['sigma'], 'next', fill_value='extrapolate') #piecewise constant interpolation of the volatility
 		self.yieldfun = interpolate.interp1d(self.yieldcurve['TimeToZero'], self.yieldcurve['ZeroRate'], 'linear', fill_value='extrapolate') #linear interpolation of the zero rate
 		self.meanreversion = meanreversion
 
@@ -35,9 +35,9 @@ class RatesDriver:
 		return self.yieldcurve['ZeroRate'][1] #First short rate approximated with first nonzero zero rate
 
 	def get_inst_fwd_rates(self, times):
-		self.deltaT = times[1] - times[0] #determine time intervals of timegrid
+		self.timedifferences = np.diff(times) #determine time intervals of timegrid, len(timedifferences) = len(times) - 1
 		self.discount_factors = np.power(1 + self.get_yield(times), -times)
-		self.instantaneous_forward_rates = (self.discount_factors[0:(len(self.discount_factors)-1)] / self.discount_factors[1:len(self.discount_factors)] - 1) / self.deltaT #Approximate intstan. fwd rates with standard forward rates
+		self.instantaneous_forward_rates = (self.discount_factors[0:(len(self.discount_factors)-1)] / self.discount_factors[1:len(self.discount_factors)] - 1) / self.timedifferences #Approximate intstan. fwd rates with standard forward rates
 		self.instantaneous_forward_rates = np.append(np.array(self.get_firstshortrate()), self.instantaneous_forward_rates) #Approximate first inst fwd rate (= first short rate) with first zero rate
 		return self.instantaneous_forward_rates
 
@@ -50,7 +50,7 @@ class FXDriver:
 		self.name = name
 		self.volatility = volatility
 		self.spotfx = spotfx
-		self.volatilityfun = interpolate.interp1d(self.volatility['TimeToZero'], self.volatility['sigma'], 'zero', fill_value='extrapolate') #piecewise constant interpolation of the volatility
+		self.volatilityfun = interpolate.interp1d(self.volatility['TimeToZero'], self.volatility['sigma'], 'next', fill_value='extrapolate') #piecewise constant interpolation of the volatility
 
 	def get_name(self):
 		return self.name
@@ -58,8 +58,8 @@ class FXDriver:
 	def get_volatility(self, time):
 		return self.volatilityfun(time)	
 
-	def get_spotFX(self):
-		return self.spotFX
+	def get_spotfx(self):
+		return self.spotfx
 
 
 class InflationDriver:
