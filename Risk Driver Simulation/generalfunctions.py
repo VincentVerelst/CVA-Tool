@@ -78,8 +78,10 @@ def ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxdrivers, random_mat
 		#Exact solution scheme for x(t)
 		domestic_ou[:,i+1] = domestic_ou[:,i] * np.exp(- irdrivers[0].get_meanreversion() * deltaT[i]) + irdrivers[0].get_volatility(timegrid[i+1]) * random_matrices[0][:,i] * np.sqrt((1 - np.exp(-2 * irdrivers[0].get_meanreversion() * deltaT[i]))/(2 * irdrivers[0].get_meanreversion()))
 		domestic_short_rates[:, i+1] = domestic_ou[:,i+1] + betas[0][i+1]
+		#Create shortrates object containing all necessary info needed later in pricing
+		domestic_short_rates_object = ShortRates(irdrivers[0].get_name(), domestic_short_rates, irdrivers[0].get_yieldcurve(), irdrivers[0].get_volatility_frame(), irdrivers[0].get_meanreversion())
 
-	short_rates.append(domestic_short_rates)
+	short_rates.append(domestic_short_rates_object)
 	#Simulate foreign short rate (OU)
 	for j in range(1, n_irdrivers):
 		foreign_ou = np.zeros((simulation_amount, len(timegrid)))
@@ -89,7 +91,11 @@ def ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxdrivers, random_mat
 			#Exact solution scheme for x(t)
 			foreign_ou[:,i+1] = foreign_ou[:,i] * np.exp(- irdrivers[j].get_meanreversion() * deltaT[i]) + (irdrivers[j].get_volatility(timegrid[i+1]) * fxdrivers[j-1].get_volatility(timegrid[i+1]) * correlationmatrix[j][n_irdrivers + j - 1]/irdrivers[j].get_meanreversion()) * (np.exp(- irdrivers[j].get_meanreversion() * deltaT[i]) - 1) + irdrivers[j].get_volatility(timegrid[i+1]) * random_matrices[j][:,i] * np.sqrt((1 - np.exp(-2 * irdrivers[j].get_meanreversion() * deltaT[i]))/(2 * irdrivers[j].get_meanreversion()))
 			foreign_short_rates[:, i+1] = foreign_ou[:,i+1] + betas[j][i+1]
-		short_rates.append(foreign_short_rates)
+		
+		#Create shortrates object containing all necessary info needed later in pricing
+		foreign_short_rates_object = ShortRates(irdrivers[j].get_name(), foreign_short_rates, irdrivers[j].get_yieldcurve(), irdrivers[j].get_volatility_frame(), irdrivers[j].get_meanreversion())
+
+		short_rates.append(foreign_short_rates_object)
 	
 	
 	#simulate the spot FX rates
@@ -98,9 +104,11 @@ def ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxdrivers, random_mat
 		spotfx = np.zeros((simulation_amount, len(timegrid)))
 		spotfx[:,0] = fxdrivers[j].get_spotfx() 
 		for i in range(0, len(timegrid) - 1):
-			spotfx[:,i+1] = spotfx[:,i] + spotfx[:,i] * ( (short_rates[0][:,i+1] - short_rates[j+1][:,i+1]) * deltaT[i] + fxdrivers[j].get_volatility(timegrid[i+1]) * np.sqrt(deltaT[i]) * random_matrices[n_irdrivers + j][:,i] )
+			spotfx[:,i+1] = spotfx[:,i] + spotfx[:,i] * ( (short_rates[0].get_simulated_rates()[:,i+1] - short_rates[j+1].get_simulated_rates()[:,i+1]) * deltaT[i] + fxdrivers[j].get_volatility(timegrid[i+1]) * np.sqrt(deltaT[i]) * random_matrices[n_irdrivers + j][:,i] )
 
-		fxspot_rates.append(spotfx)
+		#Create fxrates object containing all necessary info needed later in pricing	
+		spotfx_object = FXRates(fxdrivers[j].get_name(), spotfx, fxdrivers[j].get_spotfx(), fxdrivers[j].get_volatility_frame())
+		fxspot_rates.append(spotfx_object)
 	
 	return(short_rates, fxspot_rates)
 

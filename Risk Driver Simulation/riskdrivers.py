@@ -22,6 +22,12 @@ class RatesDriver:
 	def get_name(self):
 		return self.name
 
+	def get_yieldcurve(self):
+		return self.yieldcurve
+
+	def get_volatility_frame(self):
+		return self.volatility #to give to simulated object afterwards
+
 	def get_volatility(self, time):
 		return self.volatilityfun(time)
 
@@ -55,6 +61,9 @@ class FXDriver:
 	def get_name(self):
 		return self.name
 
+	def get_volatility_frame(self):
+		return self.volatility
+
 	def get_volatility(self, time):
 		return self.volatilityfun(time)	
 
@@ -71,9 +80,9 @@ class InflationDriver:
 		self.realvolatility = realvolatility
 		self.nominalvolatility = nominalvolatility
 		self.indexvolatility = indexvolatility
-		self.realvolatilityfun = interpolate.interp1d(self.realvolatility['TimeToZero'], self.realvolatility['sigma'], 'zero', fill_value='extrapolate') #piecewise constant interpolation of the volatility
-		self.nominalvolatilityfun = interpolate.interp1d(self.nominalvolatility['TimeToZero'], self.nominalvolatility['sigma'], 'zero', fill_value='extrapolate') #piecewise constant interpolation of the volatility
-		self.indexvolatilityfun = interpolate.interp1d(self.indexvolatility['TimeToZero'], self.indexvolatility['sigma'], 'zero', fill_value='extrapolate') #piecewise constant interpolation of the volatility
+		self.realvolatilityfun = interpolate.interp1d(self.realvolatility['TimeToZero'], self.realvolatility['sigma'], 'next', fill_value='extrapolate') #piecewise constant interpolation of the volatility
+		self.nominalvolatilityfun = interpolate.interp1d(self.nominalvolatility['TimeToZero'], self.nominalvolatility['sigma'], 'next', fill_value='extrapolate') #piecewise constant interpolation of the volatility
+		self.indexvolatilityfun = interpolate.interp1d(self.indexvolatility['TimeToZero'], self.indexvolatility['sigma'], 'next', fill_value='extrapolate') #piecewise constant interpolation of the volatility
 		self.realratefun = interpolate.interp1d(self.realrate['TimeToZero'], self.realrate['ZeroRate'], 'linear', fill_value='extrapolate') #linear interpolation of the zero rate
 		self.nominalratefun = interpolate.interp1d(self.nominalrate['TimeToZero'], self.nominalrate['ZeroRate'], 'linear', fill_value='extrapolate') #linear interpolation of the zero rate
 		self.realmeanreversion = realmeanreversion
@@ -122,3 +131,59 @@ class EquityDriver:
 
 	def get_volatility(self, time):
 		return self.volatilityfun(time)
+
+
+#After simumlation we need objects to determine the stochastic DF's etc.
+
+class ShortRates:
+	def __init__(self, name, simulated_rates, yieldcurve, volatility, meanreversion):
+		self.name = name
+		self.simulated_rates = simulated_rates
+		self.yieldcurve = yieldcurve
+		self.volatility = volatility 
+		self.meanreversion = meanreversion 
+		self.volatilityfun = interpolate.interp1d(self.volatility['TimeToZero'], self.volatility['sigma'], 'next', fill_value='extrapolate') #piecewise constant interpolation of the volatility
+		self.yieldfun = interpolate.interp1d(self.yieldcurve['TimeToZero'], self.yieldcurve['ZeroRate'], 'linear', fill_value='extrapolate') #linear interpolation of the zero rate
+
+	def get_name(self):
+		return self.name
+
+	def get_simulated_rates(self):
+		return self.simulated_rates
+
+	def get_volatility(self, time):
+		return self.volatilityfun(time)
+
+	def get_yield(self, time):
+		return self.yieldfun(time)
+	
+	def get_meanreversion(self):
+		return self.meanreversion
+
+	def get_stochastic_discount_factor(self, times):
+		###TO PROGRAM ####
+		pass
+
+	def get_stochastic_zero_rate(self, times):
+		###TO PROGRAM ####
+		pass
+
+class FXRates:
+	def __init__(self, name, simulated_rates, spotfx, volatility):
+		self.name = name
+		self.simulated_rates = simulated_rates
+		self.spotfx = spotfx
+		self.volatility = volatility 
+		self.volatilityfun = interpolate.interp1d(self.volatility['TimeToZero'], self.volatility['sigma'], 'next', fill_value='extrapolate') #piecewise constant interpolation of the volatility
+
+	def get_name(self):
+		return self.name
+
+	def get_simulated_rates(self):
+		return self.simulated_rates
+
+	def get_spotfx(self):
+		return self.spotfx
+
+	def get_volatility(self, time):
+		return self.volatilityfun(time)	

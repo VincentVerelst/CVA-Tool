@@ -79,9 +79,9 @@ chol, rand_matrices = mc_simulate_hwbs(irdrivers, fxdrivers, inflationdrivers, e
 shortrates, fxrates = ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxdrivers, rand_matrices, correlationmatrix)
 
 
-avgdomrate = np.mean(shortrates[0], axis=0)
-avgforrate = np.mean(shortrates[1], axis=0)
-avgfxrate = np.mean(fxrates[0], axis=0)
+avgdomrate = np.mean(shortrates[0].get_simulated_rates(), axis=0)
+avgforrate = np.mean(shortrates[1].get_simulated_rates(), axis=0)
+avgfxrate = np.mean(fxrates[0].get_simulated_rates(), axis=0)
 
 plt.plot(timegrid, avgfxrate)
 plt.show()
