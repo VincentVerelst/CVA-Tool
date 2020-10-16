@@ -5,8 +5,9 @@ import math
 import matplotlib.pyplot as plt
 import QuantLib as ql #Requires "pip install QuantLib" in Anaconda prompt
 import yearfrac as yf #Requires "pip install yearfrac" in Anaconda prompt
-from riskdrivers import *
-from generalfunctions import *
+from RiskDriverSimulation import *
+
+
 
 #############################################################################
 ########## READ IN ALL INFOMRATION ############

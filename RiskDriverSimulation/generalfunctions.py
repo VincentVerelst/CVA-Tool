@@ -5,7 +5,7 @@ import math
 import QuantLib as ql #Requires "pip install QuantLib" in Anaconda prompt
 import yearfrac as yf #Requires "pip install yearfrac" in Anaconda prompt
 from scipy import interpolate
-from riskdrivers import *
+from .riskdrivers import *
 
 #Function that creates riskdrivers
 def create_riskdrivers(irinput, fxinput, inflationinput, equityinput):
