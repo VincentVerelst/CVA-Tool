@@ -141,3 +141,17 @@ def mc_simulate_hwbs(irdrivers, fxdrivers, inflationdrivers, equitydrivers, corr
 
 	return(cholesky_correlationmatrix, correlated_random_matrices)
 
+def ql_to_datetime(d):
+	return datetime.datetime(d.year(), d.month(), d.dayOfMonth())
+
+def create_payment_times(frequency, startdate, enddate, valdate):
+	cal = ql.UnitedKingdom() #We will consider the weekends and holidays of the UK as a proxy
+	#Convert dates to quantlib date objects
+	start_date = ql.Date(startdate.day, startdate.month, startdate.year)
+	end_date = ql.Date(enddate.day, enddate.month, enddate.year)
+	frequency = frequency*12 #Frequency in excel is expressed in years, but frequency in schedule must be in months
+	paydates = ql.MakeSchedule(start_date, end_date, ql.Period(str(int(frequency)) + 'M'), calendar=cal, backwards=True, convention=ql.ModifiedFollowing)
+	schedule = np.array([ql_to_datetime(d) for d in paydates]) #convert the quantlib dates back to datetime dates
+	schedule = schedule[schedule > valdate] #remove all dates that are before the valuation date
+	yearfrac = yf.yearfrac(valdate, schedule) #determine the yearfracs wrt the valdate
+	return(yearfrac)

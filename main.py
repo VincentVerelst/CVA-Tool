@@ -7,6 +7,14 @@ import QuantLib as ql #Requires "pip install QuantLib" in Anaconda prompt
 import yearfrac as yf #Requires "pip install yearfrac" in Anaconda prompt
 from RiskDriverSimulation import *
 
+#############################################################################
+########## User Defined Data ############
+#############################################################################
+#All deals
+fixedlegs = np.array([1]) #Include all fixed-floating swaps you want to include in the netting set
+floatdeals = np.array([]) #Include all fixed-fixed swaps you want to include in the netting set
+fxforwarddeals = np.array([]) #Include all FX Forwards you want to include in the netting set
+swaptiondeals = np.array([]) #Include all swaptions you want to include in the netting set
 
 
 #############################################################################
@@ -14,10 +22,10 @@ from RiskDriverSimulation import *
 #############################################################################
 
 ####Pricing Information
-fixedfloatinput = pd.read_excel(r'Pricing/fixedfloatswap.xlsx')
+fixedleginput = pd.read_excel(r'Runfiles/Pricing/fixedlegs.xlsx', skiprows=2, index_col=0)
 
 #Monte Carlo Information
-mcinput = pd.read_excel(r'Runfiles/MCDetails.xlsx')
+mcinput = pd.read_excel(r'Runfiles/RiskDriverSimulation/MCDetails.xlsx')
 valuation_date = mcinput['Valuation Date'][0]
 end_date = mcinput['End Date Netting Set'][0]
 correlation = mcinput['Correlation'][0]
@@ -37,14 +45,14 @@ if maturity_yearfrac not in timegrid:
 	timegrid = np.append(timegrid, maturity_yearfrac)
 
 #Read in rates
-irinput = pd.read_excel(r'Runfiles/IRinput.xlsx')
+irinput = pd.read_excel(r'Runfiles/RiskDriverSimulation/IRinput.xlsx')
 irinput = irinput.dropna(1) #Drops all columns with NA values
 irinput = irinput.drop(irinput.columns[0], axis=1) #Drops first column
 iramount = irinput.count(1)[0] #Count the amount of currencies
 
 
 #Read in FX
-fxinput = pd.read_excel(r'Runfiles/FXinput.xlsx')
+fxinput = pd.read_excel(r'Runfiles/RiskDriverSimulation/FXinput.xlsx')
 fxinput = fxinput.dropna(1) #Drops all columns with NA values
 fxinput = fxinput.drop(fxinput.columns[0], axis=1) #Drops first column
 fxamount = fxinput.count(1)[0] #Count the amount of currencies
@@ -53,12 +61,12 @@ if(fxamount != iramount - 1):
 	exit()
 
 #Read in inflation (which is a combo of rates and FX)
-inflationinput = pd.read_excel(r'Runfiles/InflationInput.xlsx')
+inflationinput = pd.read_excel(r'Runfiles/RiskDriverSimulation/InflationInput.xlsx')
 inflationinput = inflationinput.drop(inflationinput.columns[0], axis=1) #Drops first column
 inflationinput = inflationinput.dropna(1) #Drops all columns with NA values
 inflationamount = inflationinput.count(1)[0] #Count the amount of currencies
 
-equityinput = pd.read_excel(r'Runfiles/EquityInput.xlsx')
+equityinput = pd.read_excel(r'Runfiles/RiskDriverSimulation/EquityInput.xlsx')
 equityinput = equityinput.drop(equityinput.columns[0], axis=1) #Drops first column
 equityinput = equityinput.dropna(1) #Drops all columns with NA values
 equityamount = equityinput.count(1)[0] #Count the amount of currencies
@@ -74,6 +82,9 @@ if(num_rows != total or num_cols != total):
 	print("Error: enter correlation matrix with correct dimensions: (2n-1)x(2n-1), with n = amount of risk drivers")
 	exit()
 
+#############################################################################
+########## Monte Carlo Simulation ############
+#############################################################################
 
 irdrivers, fxdrivers, inflationdrivers, equitydrivers = create_riskdrivers(irinput, fxinput, inflationinput, equityinput)
 
@@ -82,11 +93,18 @@ chol, rand_matrices = mc_simulate_hwbs(irdrivers, fxdrivers, inflationdrivers, e
 
 shortrates, fxrates = ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxdrivers, rand_matrices, correlationmatrix)
 
-for i in range(0, len(shortrates)):
-	print(shortrates[i].get_name())
 # avgdomrate = np.mean(shortrates[0].get_simulated_rates(), axis=0)
 # avgforrate = np.mean(shortrates[1].get_simulated_rates(), axis=0)
 # avgfxrate = np.mean(fxrates[0].get_simulated_rates(), axis=0)
 
 # plt.plot(timegrid, avgfxrate)
 # plt.show()
+
+#############################################################################
+########## Pricing ############
+#############################################################################
+
+net_future_mtm = np.zeros((simulation_amount, len(timegrid)))
+
+paytimes = fixedpricing(fixedlegs, net_future_mtm, fixedleginput, timegrid, shortrates, fxrates)
+print(paytimes)
