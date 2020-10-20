@@ -136,12 +136,13 @@ class EquityDriver:
 #After simumlation we need objects to determine the stochastic DF's etc.
 
 class ShortRates:
-	def __init__(self, name, simulated_rates, yieldcurve, volatility, meanreversion):
+	def __init__(self, name, simulated_rates, yieldcurve, volatility, meanreversion, timegrid):
 		self.name = name
 		self.simulated_rates = simulated_rates
 		self.yieldcurve = yieldcurve
 		self.volatility = volatility 
 		self.meanreversion = meanreversion 
+		self.timegrid = timegrid
 		self.volatilityfun = interpolate.interp1d(self.volatility['TimeToZero'], self.volatility['sigma'], 'next', fill_value='extrapolate') #piecewise constant interpolation of the volatility
 		self.yieldfun = interpolate.interp1d(self.yieldcurve['TimeToZero'], self.yieldcurve['ZeroRate'], 'linear', fill_value='extrapolate') #linear interpolation of the zero rate
 
@@ -160,8 +161,18 @@ class ShortRates:
 	def get_meanreversion(self):
 		return self.meanreversion
 
-	def get_stochastic_discount_factor(self, times):
-		###TO PROGRAM ####
+		#times, timegrid, n, shortrates, simulation_amount
+	def get_stochastic_affine_discount_factors(self, times, n):
+		#ADD INST FWD RATES on timegrid as input 
+		#times = future times on which you want to calculate stoch DFs (future times as seen from today!)
+		#n = point in simulation, so right now we are on time = timegrid[n], so all times must be times > timegrid[n]
+		libor_zc_times = self.get_yield(times)
+		libor_df_times = np.power((1 + libor_zc_times), -times)
+		libor_zc_n = self.get_yield(self.timegrid[n])
+		libor_df_n = np.power((1 + libor_zc_n), -timegrid[n]) 
+		#Calculate ln(a(t,T))
+		first_term = np.ln(libor_df_times / libor_df_n)
+		second_term = 
 		pass
 
 	def get_stochastic_zero_rate(self, times):

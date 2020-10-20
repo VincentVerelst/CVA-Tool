@@ -79,7 +79,7 @@ def ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxdrivers, random_mat
 		domestic_ou[:,i+1] = domestic_ou[:,i] * np.exp(- irdrivers[0].get_meanreversion() * deltaT[i]) + irdrivers[0].get_volatility(timegrid[i+1]) * random_matrices[0][:,i] * np.sqrt((1 - np.exp(-2 * irdrivers[0].get_meanreversion() * deltaT[i]))/(2 * irdrivers[0].get_meanreversion()))
 		domestic_short_rates[:, i+1] = domestic_ou[:,i+1] + betas[0][i+1]
 		#Create shortrates object containing all necessary info needed later in pricing
-		domestic_short_rates_object = ShortRates(irdrivers[0].get_name(), domestic_short_rates, irdrivers[0].get_yieldcurve(), irdrivers[0].get_volatility_frame(), irdrivers[0].get_meanreversion())
+		domestic_short_rates_object = ShortRates(irdrivers[0].get_name(), domestic_short_rates, irdrivers[0].get_yieldcurve(), irdrivers[0].get_volatility_frame(), irdrivers[0].get_meanreversion(), timegrid)
 
 	short_rates.append(domestic_short_rates_object)
 	#Simulate foreign short rate (OU)
@@ -93,7 +93,7 @@ def ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxdrivers, random_mat
 			foreign_short_rates[:, i+1] = foreign_ou[:,i+1] + betas[j][i+1]
 		
 		#Create shortrates object containing all necessary info needed later in pricing
-		foreign_short_rates_object = ShortRates(irdrivers[j].get_name(), foreign_short_rates, irdrivers[j].get_yieldcurve(), irdrivers[j].get_volatility_frame(), irdrivers[j].get_meanreversion())
+		foreign_short_rates_object = ShortRates(irdrivers[j].get_name(), foreign_short_rates, irdrivers[j].get_yieldcurve(), irdrivers[j].get_volatility_frame(), irdrivers[j].get_meanreversion(), timegrid)
 
 		short_rates.append(foreign_short_rates_object)
 	
@@ -111,7 +111,6 @@ def ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxdrivers, random_mat
 		fxspot_rates.append(spotfx_object)
 	
 	return(short_rates, fxspot_rates)
-
 
 
 def mc_simulate_hwbs(irdrivers, fxdrivers, inflationdrivers, equitydrivers, correlationmatrix, timegrid, simulation_amount):

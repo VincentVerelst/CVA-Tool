@@ -106,5 +106,6 @@ shortrates, fxrates = ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxd
 
 net_future_mtm = np.zeros((simulation_amount, len(timegrid)))
 
-paytimes = fixedpricing(fixedlegs, net_future_mtm, fixedleginput, timegrid, shortrates, fxrates)
-print(paytimes)
+#paytimes = fixedpricing(fixedlegs, net_future_mtm, fixedleginput, timegrid, shortrates, fxrates, simulation_amount, irinput)
+
+#print(paytimes.get_name())
