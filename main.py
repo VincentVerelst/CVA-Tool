@@ -22,7 +22,7 @@ swaptiondeals = np.array([]) #Include all swaptions you want to include in the n
 #############################################################################
 
 ####Pricing Information
-fixedleginput = pd.read_excel(r'Runfiles/Pricing/fixedlegs.xlsx', skiprows=2, index_col=0)
+fixedleginput = pd.read_excel(r'Runfiles/Pricing/fixedlegs.xlsx', skiprows=2, index_col=0) #index_col=0 is essential. With this you can reference the deal with the number you assigned to it, instead of its index
 
 #Monte Carlo Information
 mcinput = pd.read_excel(r'Runfiles/RiskDriverSimulation/MCDetails.xlsx')
@@ -93,12 +93,13 @@ chol, rand_matrices = mc_simulate_hwbs(irdrivers, fxdrivers, inflationdrivers, e
 
 shortrates, fxrates = ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxdrivers, rand_matrices, correlationmatrix)
 
-# avgdomrate = np.mean(shortrates[0].get_simulated_rates(), axis=0)
+avgdomrate = np.mean(shortrates[0].get_simulated_rates(), axis=0)
 # avgforrate = np.mean(shortrates[1].get_simulated_rates(), axis=0)
 # avgfxrate = np.mean(fxrates[0].get_simulated_rates(), axis=0)
 
-# plt.plot(timegrid, avgfxrate)
+# plt.plot(timegrid, avgdomrate)
 # plt.show()
+
 
 #############################################################################
 ########## Pricing ############
@@ -106,6 +107,6 @@ shortrates, fxrates = ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxd
 
 net_future_mtm = np.zeros((simulation_amount, len(timegrid)))
 
-#paytimes = fixedpricing(fixedlegs, net_future_mtm, fixedleginput, timegrid, shortrates, fxrates, simulation_amount, irinput)
+net_future_mtm = fixedpricing(fixedlegs, net_future_mtm, fixedleginput, timegrid, shortrates, fxrates, simulation_amount, irinput)
 
-#print(paytimes.get_name())
+

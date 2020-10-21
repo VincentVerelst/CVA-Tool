@@ -79,7 +79,7 @@ def ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxdrivers, random_mat
 		domestic_ou[:,i+1] = domestic_ou[:,i] * np.exp(- irdrivers[0].get_meanreversion() * deltaT[i]) + irdrivers[0].get_volatility(timegrid[i+1]) * random_matrices[0][:,i] * np.sqrt((1 - np.exp(-2 * irdrivers[0].get_meanreversion() * deltaT[i]))/(2 * irdrivers[0].get_meanreversion()))
 		domestic_short_rates[:, i+1] = domestic_ou[:,i+1] + betas[0][i+1]
 		#Create shortrates object containing all necessary info needed later in pricing
-		domestic_short_rates_object = ShortRates(irdrivers[0].get_name(), domestic_short_rates, irdrivers[0].get_yieldcurve(), irdrivers[0].get_volatility_frame(), irdrivers[0].get_meanreversion(), timegrid)
+		domestic_short_rates_object = ShortRates(irdrivers[0].get_name(), domestic_short_rates, irdrivers[0].get_yieldcurve(), irdrivers[0].get_volatility_frame(), irdrivers[0].get_meanreversion(), timegrid, irdrivers[0].get_inst_fwd_rates(timegrid))
 
 	short_rates.append(domestic_short_rates_object)
 	#Simulate foreign short rate (OU)
@@ -93,7 +93,7 @@ def ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxdrivers, random_mat
 			foreign_short_rates[:, i+1] = foreign_ou[:,i+1] + betas[j][i+1]
 		
 		#Create shortrates object containing all necessary info needed later in pricing
-		foreign_short_rates_object = ShortRates(irdrivers[j].get_name(), foreign_short_rates, irdrivers[j].get_yieldcurve(), irdrivers[j].get_volatility_frame(), irdrivers[j].get_meanreversion(), timegrid)
+		foreign_short_rates_object = ShortRates(irdrivers[j].get_name(), foreign_short_rates, irdrivers[j].get_yieldcurve(), irdrivers[j].get_volatility_frame(), irdrivers[j].get_meanreversion(), timegrid, irdrivers[j].get_inst_fwd_rates(timegrid))
 
 		short_rates.append(foreign_short_rates_object)
 	
@@ -153,4 +153,31 @@ def create_payment_times(frequency, startdate, enddate, valdate):
 	schedule = np.array([ql_to_datetime(d) for d in paydates]) #convert the quantlib dates back to datetime dates
 	schedule = schedule[schedule > valdate] #remove all dates that are before the valuation date
 	yearfrac = yf.yearfrac(valdate, schedule) #determine the yearfracs wrt the valdate
+	yearfrac = np.array(yearfrac) #convert to numpy array
 	return(yearfrac)
+
+def include_yield_curve_basis(times, first_yield_curve, second_yield_curve, timegrid, n, stoch_discount_factors):
+	#Both yield_curve inputs are pd. Dataframes with one colum 'TimeToZero' and the other one 'ZeroRate'
+	#times is the times on which we want to have stoch dfs. times > timegrid[n] always
+	#stoch_discount_factors is the matrix in which we want to include the deterministic basis between the two specified yield curves
+	first_yield_fun = interpolate.interp1d(first_yield_curve['TimeToZero'], first_yield_curve['ZeroRate'], 'linear', fill_value='extrapolate') #linear interpolation of the zero rate
+	second_yield_fun = interpolate.interp1d(second_yield_curve['TimeToZero'], second_yield_curve['ZeroRate'], 'linear', fill_value='extrapolate') #linear interpolation of the zero rate
+
+	first_rates = first_yield_fun(timegrid)
+	second_rates = second_yield_fun(timegrid)
+	diff = second_rates - first_rates 
+
+	diff_fun = interpolate.interp1d(timegrid, diff, 'linear', fill_value='extrapolate') #linear interpolation of the difference between rates
+
+	stoch_zero_rates = np.power(1 / stoch_discount_factors, 1 / (times - timegrid[n])) - 1 #convert original DF's to zero rates
+	basisincluded_stoch_zero_rates = stoch_zero_rates + diff_fun(times - timegrid[n]) #add the deterministic basis (which is still time dependent)
+	basisincluded_stoch_discount_factors = np.power(1 + basisincluded_stoch_zero_rates, -(times-timegrid[n]))
+	return(basisincluded_stoch_discount_factors)
+
+#Function to check whether input (from excel for example) can be converted to float or not
+def isfloat(value):
+	try:
+		float(value)
+		return True
+	except ValueError:
+		return False

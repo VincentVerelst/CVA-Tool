@@ -48,7 +48,7 @@ class RatesDriver:
 		return self.instantaneous_forward_rates
 
 	def get_beta(self, times):
-		self.beta = self.get_inst_fwd_rates(times) + (np.power(self.get_volatility(times),2) / (np.power(self.get_meanreversion(),2))) * np.power(1 - np.exp(-self.get_meanreversion()*times),2)
+		self.beta = self.get_inst_fwd_rates(times) + (np.power(self.get_volatility(times),2) / (2 * np.power(self.meanreversion,2))) * np.power(1 - np.exp(-self.meanreversion*times),2)
 		return self.beta 
 		
 class FXDriver:
@@ -136,13 +136,14 @@ class EquityDriver:
 #After simumlation we need objects to determine the stochastic DF's etc.
 
 class ShortRates:
-	def __init__(self, name, simulated_rates, yieldcurve, volatility, meanreversion, timegrid):
+	def __init__(self, name, simulated_rates, yieldcurve, volatility, meanreversion, timegrid, inst_fwd_rates):
 		self.name = name
 		self.simulated_rates = simulated_rates
 		self.yieldcurve = yieldcurve
 		self.volatility = volatility 
 		self.meanreversion = meanreversion 
 		self.timegrid = timegrid
+		self.inst_fwd_rates = inst_fwd_rates
 		self.volatilityfun = interpolate.interp1d(self.volatility['TimeToZero'], self.volatility['sigma'], 'next', fill_value='extrapolate') #piecewise constant interpolation of the volatility
 		self.yieldfun = interpolate.interp1d(self.yieldcurve['TimeToZero'], self.yieldcurve['ZeroRate'], 'linear', fill_value='extrapolate') #linear interpolation of the zero rate
 
@@ -157,6 +158,9 @@ class ShortRates:
 
 	def get_yield(self, time):
 		return self.yieldfun(time)
+
+	def get_yield_curve(self):
+		return self.yieldcurve
 	
 	def get_meanreversion(self):
 		return self.meanreversion
@@ -169,11 +173,21 @@ class ShortRates:
 		libor_zc_times = self.get_yield(times)
 		libor_df_times = np.power((1 + libor_zc_times), -times)
 		libor_zc_n = self.get_yield(self.timegrid[n])
-		libor_df_n = np.power((1 + libor_zc_n), -timegrid[n]) 
+		libor_df_n = np.power((1 + libor_zc_n), -self.timegrid[n]) 
 		#Calculate ln(a(t,T))
-		first_term = np.ln(libor_df_times / libor_df_n)
-		second_term = 
-		pass
+		first_term = np.log(libor_df_times / libor_df_n)
+		second_term = self.inst_fwd_rates[n] * (1 / self.meanreversion) * (1 - np.exp(-self.meanreversion * (times - self.timegrid[n])))
+		third_term = -0.5 * np.power(self.get_volatility(times), 2) * np.power((1 / self.meanreversion) * (1 - np.exp(-self.meanreversion * (times - self.timegrid[n]))), 2) * (1 / (2 * self.meanreversion)) * (1 - np.exp(- 2 * self.meanreversion * self.timegrid[n]))
+		
+		lna = first_term + second_term + third_term
+		lna_matrix = np.tile(lna, (np.shape(self.simulated_rates)[0],1)) #Repeat the ln(a) vector (which has len = len(times)) in a matrix with amount of rows equal to simulated_short rates rows = simulation_amount
+
+		b_factor = (1 / self.meanreversion) * (1 - np.exp(- self.meanreversion * (times - self.timegrid[n]))) #b(t,T)
+		b_factor_matrix = np.transpose(np.tile(b_factor, (np.shape(self.simulated_rates)[0],1)))#Same as for lna: create a matrix with repeated b_factor in rows, but transposed because we still have to multiply it with array
+
+		stoch_df_matrix = np.exp(lna_matrix - np.transpose(b_factor_matrix * self.simulated_rates[:,n]))
+
+		return(stoch_df_matrix)
 
 	def get_stochastic_zero_rate(self, times):
 		###TO PROGRAM ####
