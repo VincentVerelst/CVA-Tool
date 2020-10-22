@@ -181,3 +181,94 @@ def isfloat(value):
 		return True
 	except ValueError:
 		return False
+
+def fixedvalue(notional, freq, rate, discount_curve, timegrid, n, shortrates, futurepaytimes, nonotionalexchange= None):
+	sr_stoch_discount_factors = shortrates.get_stochastic_affine_discount_factors(futurepaytimes, n)
+	leg_stoch_discount_factors = include_yield_curve_basis(futurepaytimes, shortrates.get_yield_curve(), discount_curve, timegrid, n, sr_stoch_discount_factors)
+
+	#distinguish between amortizing and fixed notional
+	if isfloat(notional):
+		notional = float(notional) #make sure it is floating type
+		fixedpayment = freq*rate*notional #freq is used as approx for yearfrac, since daycount is not taken into account
+		fixedvalues = fixedpayment * leg_stoch_discount_factors #This is a matrix, possibly containing only one column if only one payment is left. 
+
+		#Add notional exchange, unless specified otherwise
+		if nonotionalexchange is None:
+			fixedvalues[:,-1] += notional*leg_stoch_discount_factors[:,-1]
+
+		fixedvalues = np.sum(fixedvalues, axis=1) #Each row is summed
+
+	#if amortizing notional will not be float
+	else: 
+		amortizing = pd.read_excel(r'Input/Amortizing/' + notional + '.xlsx')
+		amortizing_notional = np.array(amortizing['Notional'])
+		amount_paytimes = len(futurepaytimes)
+		amortizing_notional = amortizing_notional[-amount_paytimes:] #Only take notionals of payments yet to come, now length of amortizing_notional is equal to amount of columns of leg_stoch_discount_factors
+
+		fixedpayment = freq*rate*amortizing_notional
+		fixedvalues = fixedpayment * leg_stoch_discount_factors
+		if nonotionalexchange is None:
+			fixedvalues[:,-1] += amortizing_notional[-1]*leg_stoch_discount_factors[:,-1]
+
+		fixedvalues = np.sum(fixedvalues, axis=1) #Each row is summed
+
+	return(fixedvalues)
+
+
+def reset_rate_calc(reset_rates, reset_times, maturity, freq, timegrid, n, shortrates, forward_curve):
+	
+	future_reset_times = reset_times[reset_times > timegrid[n]]
+	
+	if(len(future_reset_times)==0):
+		return(reset_rates) #no more calculation has to be done if we are past last point of reset times in the simulation
+	
+	else:
+		future_discount_times = np.append(future_reset_times, maturity)
+		sr_stoch_discount_factors = shortrates.get_stochastic_affine_discount_factors(future_discount_times, n) #Stochastic discount factors of the short rate curve 
+		future_stoch_discount_factors = include_yield_curve_basis(future_discount_times, shortrates.get_yield_curve(), forward_curve, timegrid, n, sr_stoch_discount_factors) #Include det. basis of short rate curve - forward curve
+
+		df_one = np.delete(future_stoch_discount_factors, -1, axis=1) #removes last column of matrix
+		df_two = np.delete(future_stoch_discount_factors, 0, axis=1) #removes first column of matrixµ
+
+		stoch_forward_rates = (df_one / df_two - 1) / np.diff(future_discount_times) #stochastic forward rates on payments yet to come
+
+		reset_rates[:, (reset_rates.shape[1] - len(future_reset_times)):reset_rates.shape[1]] = stoch_forward_rates #replace final columns of reset rates with the new stoch forward rates
+
+		return(reset_rates)
+
+
+def floatvalue(notional, freq, spread, discount_curve, timegrid, n, shortrates, futurepaytimes, reset_rates, nonotionalexchange= None):
+	#Calculate the stochastic discount factors on the future paytimes
+	sr_stoch_discount_factors = shortrates.get_stochastic_affine_discount_factors(futurepaytimes, n)
+	leg_stoch_discount_factors = include_yield_curve_basis(futurepaytimes, shortrates.get_yield_curve(), discount_curve, timegrid, n, sr_stoch_discount_factors)
+
+	#Determine the future reset rates
+	future_reset_rates = reset_rates[:, (reset_rates.shape[1] - len(futurepaytimes)):reset_rates.shape[1]]
+
+	#distinguish between amortizing and fixed notional
+	if isfloat(notional):
+		notional = float(notional) #make sure it is floating type
+		floatingpayment = (future_reset_rates + spread) * freq * notional
+		floatingvalues = floatingpayment * leg_stoch_discount_factors #piecewise multiplication of two matrices with same dimensions 
+
+		#Add notional exchange, unless specified otherwise
+		if nonotionalexchange is None:
+			floatingvalues[:,-1] += notional*leg_stoch_discount_factors[:,-1]
+
+		floatingvalues = np.sum(floatingvalues, axis=1) #Each row is summedµ
+
+	#if amortizing notional will not be float
+	else: 
+		amortizing = pd.read_excel(r'Input/Amortizing/' + notional + '.xlsx')
+		amortizing_notional = np.array(amortizing['Notional'])
+		amount_paytimes = len(futurepaytimes)
+		amortizing_notional = amortizing_notional[-amount_paytimes:] #Only take notionals of payments yet to come, now length of amortizing_notional is equal to amount of columns of leg_stoch_discount_factors
+
+		floatingpayment = freq * (future_reset_rates + spread) * amortizing_notional
+		floatingvalues = floatingpayment * leg_stoch_discount_factors
+		if nonotionalexchange is None:
+			floatingvalues[:,-1] += amortizing_notional[-1]*leg_stoch_discount_factors[:,-1]
+
+		floatingvalues = np.sum(floatingvalues, axis=1) #Each row is summed
+
+	return(floatingvalues)

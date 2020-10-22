@@ -11,8 +11,8 @@ from RiskDriverSimulation import *
 ########## User Defined Data ############
 #############################################################################
 #All deals
-fixedlegs = np.array([1]) #Include all fixed-floating swaps you want to include in the netting set
-floatdeals = np.array([]) #Include all fixed-fixed swaps you want to include in the netting set
+fixedlegs = np.array([]) #Include all fixed-floating swaps you want to include in the netting set
+floatlegs = np.array([1]) #Include all fixed-fixed swaps you want to include in the netting set
 fxforwarddeals = np.array([]) #Include all FX Forwards you want to include in the netting set
 swaptiondeals = np.array([]) #Include all swaptions you want to include in the netting set
 
@@ -23,6 +23,7 @@ swaptiondeals = np.array([]) #Include all swaptions you want to include in the n
 
 ####Pricing Information
 fixedleginput = pd.read_excel(r'Runfiles/Pricing/fixedlegs.xlsx', skiprows=2, index_col=0) #index_col=0 is essential. With this you can reference the deal with the number you assigned to it, instead of its index
+floatleginput = pd.read_excel(r'Runfiles/Pricing/floatlegs.xlsx', skiprows=2, index_col=0)
 
 #Monte Carlo Information
 mcinput = pd.read_excel(r'Runfiles/RiskDriverSimulation/MCDetails.xlsx')
@@ -108,5 +109,10 @@ avgdomrate = np.mean(shortrates[0].get_simulated_rates(), axis=0)
 net_future_mtm = np.zeros((simulation_amount, len(timegrid)))
 
 net_future_mtm = fixedpricing(fixedlegs, net_future_mtm, fixedleginput, timegrid, shortrates, fxrates, simulation_amount, irinput)
+
+net_future_mtm = floatpricing(floatlegs, net_future_mtm, floatleginput, timegrid, shortrates, fxrates, simulation_amount, irinput)
+
+print(np.mean(net_future_mtm, axis=0))
+
 
 
