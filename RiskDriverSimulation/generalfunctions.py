@@ -272,3 +272,22 @@ def floatvalue(notional, freq, spread, discount_curve, timegrid, n, shortrates, 
 		floatingvalues = np.sum(floatingvalues, axis=1) #Each row is summed
 
 	return(floatingvalues)
+
+
+
+def stochastic_discount(net_future_mtm, shortrates_object, timegrid, final_discount_curve):
+	#Integrate short rates using trapezium rule to obtain stochastic discount factors to today
+	shortrates = shortrates_object.get_simulated_rates() 
+	net_discounted_mtm = np.zeros((net_future_mtm.shape[0], len(timegrid)))
+	
+	net_discounted_mtm[:,0] = net_future_mtm[:,0]
+
+	for n in range(1, net_discounted_mtm.shape[1]):
+		new_shortrates = shortrates[:,0:(n+1)]
+		new_timegrid = timegrid[0:n+1]
+		sr_stoch_discount_factors = np.exp(-np.trapz(new_shortrates, new_timegrid))#Numerical integration of short rates with trapezium rule. Returns vector of length = simulation amount
+		final_stoch_discount_factors = include_yield_curve_basis(timegrid[n], shortrates_object.get_yield_curve(), final_discount_curve, timegrid, 0, sr_stoch_discount_factors)
+		net_discounted_mtm[:,n] = net_future_mtm[:,n] * final_stoch_discount_factors
+
+	return(net_discounted_mtm)
+

@@ -47,10 +47,10 @@ if maturity_yearfrac not in timegrid:
 
 #Read in rates
 irinput = pd.read_excel(r'Runfiles/RiskDriverSimulation/IRinput.xlsx')
-irinput = irinput.dropna(1) #Drops all columns with NA values
+irinput = irinput.dropna(1, how='all') #Drops all columns with NA values
 irinput = irinput.drop(irinput.columns[0], axis=1) #Drops first column
 iramount = irinput.count(1)[0] #Count the amount of currencies
-
+final_discount_curve = pd.read_excel(r'Input/Curves/' + irinput['domestic'][4] + '.xlsx') #Curve with which final future_mtms are discounted with to today
 
 #Read in FX
 fxinput = pd.read_excel(r'Runfiles/RiskDriverSimulation/FXinput.xlsx')
@@ -112,7 +112,12 @@ net_future_mtm = fixedpricing(fixedlegs, net_future_mtm, fixedleginput, timegrid
 
 net_future_mtm = floatpricing(floatlegs, net_future_mtm, floatleginput, timegrid, shortrates, fxrates, simulation_amount, irinput)
 
+
+
+
+#stochastic discounting to today
+net_discounted_mtm = stochastic_discount(net_future_mtm, shortrates[0], timegrid, final_discount_curve)
+
 print(np.mean(net_future_mtm, axis=0))
-
-
+print(np.mean(net_discounted_mtm, axis=0))
 
