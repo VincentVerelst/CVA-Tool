@@ -290,4 +290,3 @@ def stochastic_discount(net_future_mtm, shortrates_object, timegrid, final_disco
 		net_discounted_mtm[:,n] = net_future_mtm[:,n] * final_stoch_discount_factors
 
 	return(net_discounted_mtm)
-
