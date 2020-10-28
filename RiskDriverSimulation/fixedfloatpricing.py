@@ -15,8 +15,7 @@ def fixedpricing(legs, net_future_mtm, leg_input, timegrid, shortrates, fxrates,
 
 		#Determine the right short rate object
 		currency = leg_input['Currency'][leg]
-		currency_name = irinput[currency][0]
-		shortrates = next((x for x in shortrates if x.get_name() == currency_name), None) #Take shortrates object from list for which the name equals to the right currency
+		shortrates = shortrates[currency] #Take shortrates object from list for which the name equals to the right currency
 
 		#Determine the parameters needed to price
 		freq = leg_input['Freq'][leg]
@@ -33,7 +32,11 @@ def fixedpricing(legs, net_future_mtm, leg_input, timegrid, shortrates, fxrates,
 			fixedvalues = fixedvalue(notional, freq, rate, discount_curve, timegrid, n, shortrates, futurepaytimes)
 
 			future_mtm[:,n] = fixedvalues
-			
+		
+		
+		#convert with stochastic spot FX to domestic currency if it's a foreign leg 
+		if currency != 'domestic':
+			future_mtm = future_mtm * fxrates[currency]
 
 		net_future_mtm += future_mtm
 
@@ -54,8 +57,7 @@ def floatpricing(legs, net_future_mtm, leg_input, timegrid, shortrates, fxrates,
 
 		#Determine the right short rate object
 		currency = leg_input['Currency'][leg]
-		currency_name = irinput[currency][0]
-		shortrates = next((x for x in shortrates if x.get_name() == currency_name), None) #Take shortrates object from list for which the name equals to the right currency
+		shortrates = shortrates[currency] #Take shortrates object from list for which the name equals to the right currency
 
 		#Determine the parameters needed to price
 		freq = leg_input['Freq'][leg]
@@ -79,7 +81,10 @@ def floatpricing(legs, net_future_mtm, leg_input, timegrid, shortrates, fxrates,
 			floatvalues = floatvalue(notional, freq, spread, discount_curve, timegrid, n, shortrates, futurepaytimes, reset_rates)
 
 			future_mtm[:,n] = floatvalues
-			
+		
+		#convert with stochastic spot FX to domestic currency if it's a foreign leg
+		if currency != 'domestic':
+			future_mtm = future_mtm * fxrates[currency]
 
 		net_future_mtm += future_mtm
 
