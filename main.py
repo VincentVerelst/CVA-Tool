@@ -11,7 +11,7 @@ from RiskDriverSimulation import *
 ########## User Defined Data ############
 #############################################################################
 #All deals
-fixedlegs = np.array([]) #Include all fixed-floating swaps you want to include in the netting set
+fixedlegs = np.array([1]) #Include all fixed-floating swaps you want to include in the netting set
 floatlegs = np.array([1]) #Include all fixed-fixed swaps you want to include in the netting set
 fxforwarddeals = np.array([]) #Include all FX Forwards you want to include in the netting set
 swaptiondeals = np.array([]) #Include all swaptions you want to include in the netting set
@@ -103,9 +103,9 @@ shortrates, fxrates = ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxd
 # # plt.show()
 
 
-# #############################################################################
-# ########## Pricing ############
-# #############################################################################
+# # #############################################################################
+# # ########## Pricing ############
+# # #############################################################################
 
 net_future_mtm = np.zeros((simulation_amount, len(timegrid)))
 
@@ -116,12 +116,31 @@ net_future_mtm = floatpricing(floatlegs, net_future_mtm, floatleginput, timegrid
 
 
 
-# #stochastic discounting to today
+# # #stochastic discounting to today
 net_discounted_mtm = stochastic_discount(net_future_mtm, shortrates['domestic'], timegrid, final_discount_curve)
 
-print(np.mean(net_future_mtm, axis=0))
-print(np.mean(net_discounted_mtm, axis=0))
 
+# # #############################################################################
+# # ########## Exposure Calculation + Writing to Excel ############
+# # #############################################################################
 
+#Expected Exposure
+EE = np.mean(net_discounted_mtm, axis=0)
+
+#Expected Positive Exposure
+PE = net_discounted_mtm.copy()
+PE[PE < 0] = 0
+EPE = np.mean(PE, axis=0)
+
+#Expected Negative Exposure
+NE = net_discounted_mtm.copy()
+NE[NE > 0] = 0
+ENE = np.mean(NE, axis=0)
+
+#Create a dataframe with all data
+output = pd.DataFrame({"Tenor [Y]": timegrid, "EE": EE, "EPE": EPE, "ENE":ENE} )
+
+#Write to Excel
+output.to_excel("Output/exposures.xlsx")
 
 

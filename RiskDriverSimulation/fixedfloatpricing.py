@@ -3,7 +3,7 @@ from .generalfunctions import *
 
 
 
-def fixedpricing(legs, net_future_mtm, leg_input, timegrid, shortrates, fxrates, simulation_amount, irinput):
+def fixedpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_dict, fxrates, simulation_amount, irinput):
 	for leg in legs:
 		
 		paytimes = create_payment_times(leg_input['Freq'][leg], leg_input['StartDate'][leg], leg_input['EndDate'][leg], leg_input['ValDate'][leg])
@@ -15,12 +15,13 @@ def fixedpricing(legs, net_future_mtm, leg_input, timegrid, shortrates, fxrates,
 
 		#Determine the right short rate object
 		currency = leg_input['Currency'][leg]
-		shortrates = shortrates[currency] #Take shortrates object from list for which the name equals to the right currency
+		shortrates = shortrates_dict[currency] #Take shortrates object from list for which the name equals to the right currency
 
 		#Determine the parameters needed to price
 		freq = leg_input['Freq'][leg]
 		rate = leg_input['Rate'][leg]
 		notional = leg_input['Notional'][leg]
+		notional_exchange = leg_input['NotionalExchangeEnd'][leg]
 		discount_curve = pd.read_excel(r'Input/Curves/' + leg_input['Discount Curve'][leg] +  '.xlsx')
 
 		
@@ -29,14 +30,14 @@ def fixedpricing(legs, net_future_mtm, leg_input, timegrid, shortrates, fxrates,
 		for n in range(0, len(timegrid[timegrid < maturity])):
 			futurepaytimes = paytimes[paytimes > timegrid[n]]
 
-			fixedvalues = fixedvalue(notional, freq, rate, discount_curve, timegrid, n, shortrates, futurepaytimes)
+			fixedvalues = fixedvalue(notional, freq, rate, discount_curve, timegrid, n, shortrates, futurepaytimes, notional_exchange)
 
 			future_mtm[:,n] = fixedvalues
 		
 		
 		#convert with stochastic spot FX to domestic currency if it's a foreign leg 
 		if currency != 'domestic':
-			future_mtm = future_mtm * fxrates[currency]
+			future_mtm = future_mtm * fxrates[currency].get_simulated_rates()
 
 		net_future_mtm += future_mtm
 
@@ -45,7 +46,7 @@ def fixedpricing(legs, net_future_mtm, leg_input, timegrid, shortrates, fxrates,
 
 
 
-def floatpricing(legs, net_future_mtm, leg_input, timegrid, shortrates, fxrates, simulation_amount, irinput):
+def floatpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_dict, fxrates, simulation_amount, irinput):
 	for leg in legs:
 		
 		paytimes = create_payment_times(leg_input['Freq'][leg], leg_input['StartDate'][leg], leg_input['EndDate'][leg], leg_input['ValDate'][leg])
@@ -57,13 +58,14 @@ def floatpricing(legs, net_future_mtm, leg_input, timegrid, shortrates, fxrates,
 
 		#Determine the right short rate object
 		currency = leg_input['Currency'][leg]
-		shortrates = shortrates[currency] #Take shortrates object from list for which the name equals to the right currency
+		shortrates = shortrates_dict[currency] #Take shortrates object from list for which the name equals to the right currency
 
 		#Determine the parameters needed to price
 		freq = leg_input['Freq'][leg]
 		spread = leg_input['Spread'][leg]
 		first_rate = leg_input['FirstResetRate'][leg]
 		notional = leg_input['Notional'][leg]
+		notional_exchange = leg_input['NotionalExchangeEnd'][leg]
 		discount_curve = pd.read_excel(r'Input/Curves/' + leg_input['Discount Curve'][leg] +  '.xlsx')
 		forward_curve = pd.read_excel(r'Input/Curves/' + leg_input['Forward Curve'][leg] +  '.xlsx')
 
@@ -78,13 +80,13 @@ def floatpricing(legs, net_future_mtm, leg_input, timegrid, shortrates, fxrates,
 			#Calculate stochastic reset rates
 			reset_rates = reset_rate_calc(reset_rates, reset_times, maturity, freq, timegrid, n, shortrates, forward_curve)
 
-			floatvalues = floatvalue(notional, freq, spread, discount_curve, timegrid, n, shortrates, futurepaytimes, reset_rates)
+			floatvalues = floatvalue(notional, freq, spread, discount_curve, timegrid, n, shortrates, futurepaytimes, reset_rates, notional_exchange)
 
 			future_mtm[:,n] = floatvalues
 		
 		#convert with stochastic spot FX to domestic currency if it's a foreign leg
 		if currency != 'domestic':
-			future_mtm = future_mtm * fxrates[currency]
+			future_mtm = future_mtm * fxrates[currency].get_simulated_rates()
 
 		net_future_mtm += future_mtm
 

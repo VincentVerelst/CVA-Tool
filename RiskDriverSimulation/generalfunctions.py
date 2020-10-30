@@ -7,6 +7,40 @@ import yearfrac as yf #Requires "pip install yearfrac" in Anaconda prompt
 from scipy import interpolate
 from .riskdrivers import *
 
+#Function to check if a matrix is positive definite (which is a requirement for Cholesky decomposition)
+def is_positive_definite(x):
+	return np.all(np.linalg.eigvals(x) > 0) #All eigenvalues must be larger than zero 
+
+#If matrix is not positive definite, following function calculates the nearest positive definite matrix using Higham algorithm
+def _getAplus(A):
+    eigval, eigvec = np.linalg.eig(A)
+    Q = np.matrix(eigvec)
+    xdiag = np.matrix(np.diag(np.maximum(eigval, 0)))
+    return Q*xdiag*Q.T
+
+def _getPs(A, W=None):
+    W05 = np.matrix(W**.5)
+    return  W05.I * _getAplus(W05 * A * W05) * W05.I
+
+def _getPu(A, W=None):
+    Aret = np.array(A.copy())
+    Aret[W > 0] = np.array(W)[W > 0]
+    return np.matrix(Aret)
+
+def nearest_positive_definite(A, nit=10):
+    n = A.shape[0]
+    W = np.identity(n) 
+# W is the matrix used for the norm (assumed to be Identity matrix here)
+# the algorithm should work for any diagonal W
+    deltaS = 0
+    Yk = A.copy()
+    for k in range(nit):
+        Rk = Yk - deltaS
+        Xk = _getPs(Rk, W=W)
+        deltaS = Xk - Rk
+        Yk = _getPu(Xk, W=W)
+    return Yk
+
 #Function that creates riskdrivers
 def create_riskdrivers(irinput, fxinput, inflationinput, equityinput):
 	#Define all the irdriver objects
@@ -123,6 +157,9 @@ def mc_simulate_hwbs(irdrivers, fxdrivers, inflationdrivers, equitydrivers, corr
 	n_totaldrivers = n_irdrivers + n_fxdrivers + n_inflationdrivers + n_equitydrivers
 
 	#Generate antithetic correlated random paths using cholesky decomposition
+	if not is_positive_definite(correlationmatrix):
+		correlationmatrix = nearest_positive_definite(correlationmatrix)
+		
 	cholesky_correlationmatrix = np.linalg.cholesky(correlationmatrix)
 	#Generate random independent matrices with antithetic paths
 	random_matrices = []
@@ -183,7 +220,7 @@ def isfloat(value):
 	except ValueError:
 		return False
 
-def fixedvalue(notional, freq, rate, discount_curve, timegrid, n, shortrates, futurepaytimes, nonotionalexchange= None):
+def fixedvalue(notional, freq, rate, discount_curve, timegrid, n, shortrates, futurepaytimes, notionalexchange):
 	sr_stoch_discount_factors = shortrates.get_stochastic_affine_discount_factors(futurepaytimes, n)
 	leg_stoch_discount_factors = include_yield_curve_basis(futurepaytimes, shortrates.get_yield_curve(), discount_curve, timegrid, n, sr_stoch_discount_factors)
 
@@ -194,7 +231,7 @@ def fixedvalue(notional, freq, rate, discount_curve, timegrid, n, shortrates, fu
 		fixedvalues = fixedpayment * leg_stoch_discount_factors #This is a matrix, possibly containing only one column if only one payment is left. 
 
 		#Add notional exchange, unless specified otherwise
-		if nonotionalexchange is None:
+		if notionalexchange == 'yes':
 			fixedvalues[:,-1] += notional*leg_stoch_discount_factors[:,-1]
 
 		fixedvalues = np.sum(fixedvalues, axis=1) #Each row is summed
@@ -208,7 +245,7 @@ def fixedvalue(notional, freq, rate, discount_curve, timegrid, n, shortrates, fu
 
 		fixedpayment = freq*rate*amortizing_notional
 		fixedvalues = fixedpayment * leg_stoch_discount_factors
-		if nonotionalexchange is None:
+		if notionalexchange == 'yes':
 			fixedvalues[:,-1] += amortizing_notional[-1]*leg_stoch_discount_factors[:,-1]
 
 		fixedvalues = np.sum(fixedvalues, axis=1) #Each row is summed
@@ -238,7 +275,7 @@ def reset_rate_calc(reset_rates, reset_times, maturity, freq, timegrid, n, short
 		return(reset_rates)
 
 
-def floatvalue(notional, freq, spread, discount_curve, timegrid, n, shortrates, futurepaytimes, reset_rates, nonotionalexchange= None):
+def floatvalue(notional, freq, spread, discount_curve, timegrid, n, shortrates, futurepaytimes, reset_rates, notionalexchange):
 	#Calculate the stochastic discount factors on the future paytimes
 	sr_stoch_discount_factors = shortrates.get_stochastic_affine_discount_factors(futurepaytimes, n)
 	leg_stoch_discount_factors = include_yield_curve_basis(futurepaytimes, shortrates.get_yield_curve(), discount_curve, timegrid, n, sr_stoch_discount_factors)
@@ -253,7 +290,7 @@ def floatvalue(notional, freq, spread, discount_curve, timegrid, n, shortrates, 
 		floatingvalues = floatingpayment * leg_stoch_discount_factors #piecewise multiplication of two matrices with same dimensions 
 
 		#Add notional exchange, unless specified otherwise
-		if nonotionalexchange is None:
+		if notionalexchange ==  'yes':
 			floatingvalues[:,-1] += notional*leg_stoch_discount_factors[:,-1]
 
 		floatingvalues = np.sum(floatingvalues, axis=1) #Each row is summedµ
@@ -267,7 +304,7 @@ def floatvalue(notional, freq, spread, discount_curve, timegrid, n, shortrates, 
 
 		floatingpayment = freq * (future_reset_rates + spread) * amortizing_notional
 		floatingvalues = floatingpayment * leg_stoch_discount_factors
-		if nonotionalexchange is None:
+		if notionalexchange == 'yes':
 			floatingvalues[:,-1] += amortizing_notional[-1]*leg_stoch_discount_factors[:,-1]
 
 		floatingvalues = np.sum(floatingvalues, axis=1) #Each row is summed
@@ -291,3 +328,37 @@ def stochastic_discount(net_future_mtm, shortrates_object, timegrid, final_disco
 		net_discounted_mtm[:,n] = net_future_mtm[:,n] * final_stoch_discount_factors
 
 	return(net_discounted_mtm)
+
+def atm_swap_rate(time, tenor, timegrid, n, fixed_freq, float_freq, shortrates, forward_curve, discount_curve):
+#time is time at which we want to know the swap rate, so time >= timegrid[n] must hold
+	future_fixed_paytimes = np.arange(time + fixed_freq, time + tenor + fixed_freq, fixed_freq)
+	future_float_paytimes = np.arange(time + float_freq, time + tenor + float_freq, float_freq)
+
+	#stochastic discount factors of the short rate curve on the future payment times for fixed and flaot
+	fixed_sr_discount_factors = shortrates.get_stochastic_affine_discount_factors(future_fixed_paytimes, n)
+	float_sr_discount_factors = shortrates.get_stochastic_affine_discount_factors(future_float_paytimes, n)
+
+	#fixed discount factors
+	fixed_discount_factors = include_yield_curve_basis(future_fixed_paytimes, shortrates.get_yield_curve(), discount_curve, timegrid, n, fixed_sr_discount_factors)
+
+	#float forward rates 
+	float_forward_df_factors = include_yield_curve_basis(future_float_paytimes, shortrates.get_yield_curve(), forward_curve, timegrid, n, float_sr_discount_factors)
+	ones = np.ones(float_forward_df_factors.shape[0]) #To calculate forward rates add discount factors on today, which are all equal to 1
+	float_forward_df_factors = np.insert(float_forward_df_factors, 0, ones, axis=1)
+	df_one = np.delete(float_forward_df_factors, -1, axis=1) #removes last column of matrix
+	df_two = np.delete(float_forward_df_factors, 0, axis=1) #removes first column of matrix
+	float_forward_rates = (df_one / df_two - 1) / float_freq #stochastic forward rates on payments yet to come
+
+	#float discount factors
+	float_discount_factors = include_yield_curve_basis(future_float_paytimes, shortrates.get_yield_curve(), discount_curve, timegrid, n, float_sr_discount_factors)
+
+	#fixed leg value (annuity)
+	fixed_values = fixed_discount_factors * fixed_freq #matrix of all future fixed payments 
+	annuity = np.sum(fixed_values, axis=1) #vector of length simulation_amount
+
+	#float leg value 
+	float_values = float_discount_factors * float_forward_rates * float_freq #matrix times matrix times number
+
+	atm_rates = float_values / annuity #this is then a vector of the stochastic atm swap rates for the given tenor at the point timegrid[n] starting at (forward) time time
+
+	return(atm_rates)
