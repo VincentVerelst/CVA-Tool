@@ -29,8 +29,9 @@ def cmslegpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_dict, fx
 		notional_exchange = leg_input['NotionalExchangeEnd'][leg]
 		tenor = leg_input['Swap Rate Tenor'][leg]
 		convexity_adjustment = pd.read_excel(r'Input/Convexity/' + leg_input['Convexity'][leg] +  '.xlsx')
-		discount_curve = pd.read_excel(r'Input/Curves/' + leg_input['Discount Curve'][leg] +  '.xlsx')
-		forward_curve = pd.read_excel(r'Input/Curves/' + leg_input['Forward Curve'][leg] +  '.xlsx')
+		discount_curve_swaprate = pd.read_excel(r'Input/Curves/' + leg_input['Discount Curve Swaprate'][leg] +  '.xlsx')
+		discount_curve_leg = pd.read_excel(r'Input/Curves/' + leg_input['Discount Curve Leg'][leg] +  '.xlsx')
+		forward_curve_swaprate = pd.read_excel(r'Input/Curves/' + leg_input['Forward Curve Swaprate'][leg] +  '.xlsx')
 		forward_curve_freq = leg_input['Forward Curve Freq'][leg]
 
 
@@ -51,9 +52,9 @@ def cmslegpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_dict, fx
 			futurepaytimes = paytimes[paytimes > timegrid[n]]
 
 			#Calculate stochastic reset rates
-			reset_rates = cms_reset_calc(reset_rates, reset_times, tenor, forward_curve_freq, timegrid, n, shortrates, discount_curve, forward_curve, convexity_adjustment)
+			reset_rates = cms_reset_calc(reset_rates, reset_times, tenor, forward_curve_freq, timegrid, n, shortrates, discount_curve_swaprate, forward_curve_swaprate, convexity_adjustment)
 
-			cmsvalues = floatvalue(notional, freq, spread, discount_curve, timegrid, n, shortrates, futurepaytimes, reset_rates, notional_exchange)
+			cmsvalues = floatvalue(notional, freq, spread, discount_curve_leg, timegrid, n, shortrates, futurepaytimes, reset_rates, notional_exchange)
 
 			future_mtm[:,n] = cmsvalues
 		
