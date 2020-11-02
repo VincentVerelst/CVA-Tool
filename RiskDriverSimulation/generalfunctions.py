@@ -329,36 +329,50 @@ def stochastic_discount(net_future_mtm, shortrates_object, timegrid, final_disco
 
 	return(net_discounted_mtm)
 
-def atm_swap_rate(time, tenor, timegrid, n, fixed_freq, float_freq, shortrates, forward_curve, discount_curve):
+def atm_swap_rate(times, tenor, timegrid, n, fixed_freq, float_freq, shortrates_fixed, discount_curve_fixed, shortrates_float, forward_curve_float, discount_curve_float):
 #time is time at which we want to know the swap rate, so time >= timegrid[n] must hold
-	future_fixed_paytimes = np.arange(time + fixed_freq, time + tenor + fixed_freq, fixed_freq)
-	future_float_paytimes = np.arange(time + float_freq, time + tenor + float_freq, float_freq)
+	times = np.array(times)
+	atm_rates = np.zeros((shortrates_fixed.get_simulated_rates().shape[0], len(times))) #empty matrix to be filled with the atm swap rates
 
-	#stochastic discount factors of the short rate curve on the future payment times for fixed and flaot
-	fixed_sr_discount_factors = shortrates.get_stochastic_affine_discount_factors(future_fixed_paytimes, n)
-	float_sr_discount_factors = shortrates.get_stochastic_affine_discount_factors(future_float_paytimes, n)
+	for i in range(0, len(times)):
 
-	#fixed discount factors
-	fixed_discount_factors = include_yield_curve_basis(future_fixed_paytimes, shortrates.get_yield_curve(), discount_curve, timegrid, n, fixed_sr_discount_factors)
+		time = times[i]
 
-	#float forward rates 
-	float_forward_df_factors = include_yield_curve_basis(future_float_paytimes, shortrates.get_yield_curve(), forward_curve, timegrid, n, float_sr_discount_factors)
-	ones = np.ones(float_forward_df_factors.shape[0]) #To calculate forward rates add discount factors on today, which are all equal to 1
-	float_forward_df_factors = np.insert(float_forward_df_factors, 0, ones, axis=1)
-	df_one = np.delete(float_forward_df_factors, -1, axis=1) #removes last column of matrix
-	df_two = np.delete(float_forward_df_factors, 0, axis=1) #removes first column of matrix
-	float_forward_rates = (df_one / df_two - 1) / float_freq #stochastic forward rates on payments yet to come
+		future_fixed_paytimes = np.arange(time + fixed_freq, time + tenor + fixed_freq, fixed_freq)
+		future_float_paytimes = np.arange(time + float_freq, time + tenor + float_freq, float_freq)
 
-	#float discount factors
-	float_discount_factors = include_yield_curve_basis(future_float_paytimes, shortrates.get_yield_curve(), discount_curve, timegrid, n, float_sr_discount_factors)
+		#stochastic discount factors of the short rate curve on the future payment times for fixed and flaot
+		fixed_sr_discount_factors = shortrates_fixed.get_stochastic_affine_discount_factors(future_fixed_paytimes, n)
+		float_sr_discount_factors = shortrates_float.get_stochastic_affine_discount_factors(future_float_paytimes, n)
 
-	#fixed leg value (annuity)
-	fixed_values = fixed_discount_factors * fixed_freq #matrix of all future fixed payments 
-	annuity = np.sum(fixed_values, axis=1) #vector of length simulation_amount
+		#fixed discount factors
+		fixed_discount_factors = include_yield_curve_basis(future_fixed_paytimes, shortrates_fixed.get_yield_curve(), discount_curve_fixed, timegrid, n, fixed_sr_discount_factors)
 
-	#float leg value 
-	float_values = float_discount_factors * float_forward_rates * float_freq #matrix times matrix times number
+		#float forward rates 
+		float_forward_df_factors = include_yield_curve_basis(future_float_paytimes, shortrates_float.get_yield_curve(), forward_curve_float, timegrid, n, float_sr_discount_factors)
+		
+		#Determine first (stochastic) discount factor on time, which is needed for the forward rates
+		first_sr_forward_df_factor = shortrates_float.get_stochastic_affine_discount_factors(time, n)
+		first_float_forward_df_factors = include_yield_curve_basis(time, shortrates_float.get_yield_curve(), forward_curve_float, timegrid, n, first_sr_forward_df_factor)
+		float_forward_df_factors = np.append(first_float_forward_df_factors, float_forward_df_factors, axis=1)
+		
+		df_one = np.delete(float_forward_df_factors, -1, axis=1) #removes last column of matrix
+		df_two = np.delete(float_forward_df_factors, 0, axis=1) #removes first column of matrix
+		float_forward_rates = (df_one / df_two - 1) / float_freq #stochastic forward rates on payments yet to come
 
-	atm_rates = float_values / annuity #this is then a vector of the stochastic atm swap rates for the given tenor at the point timegrid[n] starting at (forward) time time
+		#float discount factors
+		float_discount_factors = include_yield_curve_basis(future_float_paytimes, shortrates_float.get_yield_curve(), discount_curve_float, timegrid, n, float_sr_discount_factors)
+
+		#fixed leg value (annuity)
+		fixed_values = fixed_discount_factors * fixed_freq #matrix of all future fixed payments 
+		annuity = np.sum(fixed_values, axis=1) #vector of length simulation_amount
+
+		#float leg value 
+		float_values = float_discount_factors * float_forward_rates * float_freq #matrix times matrix times number
+		float_value = np.sum(float_values, axis=1)
+
+		atm_rate = float_value / annuity #this is then a vector of the stochastic atm swap rates for the given tenor at the point timegrid[n] starting at (forward) time time
+
+		atm_rates[:,i] = atm_rate #nth column of the matrix to be filled  with the stochastic atm swap rates
 
 	return(atm_rates)

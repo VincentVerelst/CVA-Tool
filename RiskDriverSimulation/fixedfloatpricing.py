@@ -3,7 +3,7 @@ from .generalfunctions import *
 
 
 
-def fixedpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_dict, fxrates, simulation_amount, irinput):
+def fixedpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_dict, fxrates, simulation_amount):
 	for leg in legs:
 		
 		paytimes = create_payment_times(leg_input['Freq'][leg], leg_input['StartDate'][leg], leg_input['EndDate'][leg], leg_input['ValDate'][leg])
@@ -46,7 +46,7 @@ def fixedpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_dict, fxr
 
 
 
-def floatpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_dict, fxrates, simulation_amount, irinput):
+def floatpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_dict, fxrates, simulation_amount):
 	for leg in legs:
 		
 		paytimes = create_payment_times(leg_input['Freq'][leg], leg_input['StartDate'][leg], leg_input['EndDate'][leg], leg_input['ValDate'][leg])

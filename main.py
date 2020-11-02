@@ -11,8 +11,9 @@ from RiskDriverSimulation import *
 ########## User Defined Data ############
 #############################################################################
 #All deals
-fixedlegs = np.array([1]) #Include all fixed-floating swaps you want to include in the netting set
-floatlegs = np.array([1]) #Include all fixed-fixed swaps you want to include in the netting set
+fixedlegs = np.array([]) #Include all fixed-floating swaps you want to include in the netting set
+floatlegs = np.array([]) #Include all fixed-fixed swaps you want to include in the netting set
+cmslegs = np.array([1])
 fxforwarddeals = np.array([]) #Include all FX Forwards you want to include in the netting set
 swaptiondeals = np.array([]) #Include all swaptions you want to include in the netting set
 
@@ -24,6 +25,7 @@ swaptiondeals = np.array([]) #Include all swaptions you want to include in the n
 ####Pricing Information
 fixedleginput = pd.read_excel(r'Input/Runfiles/Pricing/fixedlegs.xlsx', skiprows=2, index_col=0) #index_col=0 is essential. With this you can reference the deal with the number you assigned to it, instead of its index
 floatleginput = pd.read_excel(r'Input/Runfiles/Pricing/floatlegs.xlsx', skiprows=2, index_col=0)
+cmsleginput = pd.read_excel(r'Input/Runfiles/Pricing/cmslegs.xlsx', skiprows=2, index_col=0)
 
 #Monte Carlo Information
 mcinput = pd.read_excel(r'Input/Runfiles/RiskDriverSimulation/MCDetails.xlsx')
@@ -103,17 +105,18 @@ shortrates, fxrates = ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxd
 # # plt.show()
 
 
+
 # # #############################################################################
 # # ########## Pricing ############
 # # #############################################################################
 
 net_future_mtm = np.zeros((simulation_amount, len(timegrid)))
 
-net_future_mtm = fixedpricing(fixedlegs, net_future_mtm, fixedleginput, timegrid, shortrates, fxrates, simulation_amount, irinput)
+net_future_mtm = fixedpricing(fixedlegs, net_future_mtm, fixedleginput, timegrid, shortrates, fxrates, simulation_amount)
 
-net_future_mtm = floatpricing(floatlegs, net_future_mtm, floatleginput, timegrid, shortrates, fxrates, simulation_amount, irinput)
+net_future_mtm = floatpricing(floatlegs, net_future_mtm, floatleginput, timegrid, shortrates, fxrates, simulation_amount)
 
-
+net_future_mtm = cmslegpricing(cmslegs, net_future_mtm, cmsleginput, timegrid, shortrates, fxrates, simulation_amount)
 
 
 # # #stochastic discounting to today
