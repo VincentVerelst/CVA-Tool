@@ -11,9 +11,9 @@ from RiskDriverSimulation import *
 ########## User Defined Data ############
 #############################################################################
 #All deals
-fixedlegs = np.array([]) #Include all fixed-floating swaps you want to include in the netting set
-floatlegs = np.array([]) #Include all fixed-fixed swaps you want to include in the netting set
-cmslegs = np.array([1])
+fixedlegs = np.arange(1,18) #Include all fixed-floating swaps you want to include in the netting set
+floatlegs = np.arange(1,16) #Include all fixed-fixed swaps you want to include in the netting set
+cmslegs = np.array([1,2])#np.array([1,2])
 fxforwarddeals = np.array([]) #Include all FX Forwards you want to include in the netting set
 swaptiondeals = np.array([]) #Include all swaptions you want to include in the netting set
 
@@ -23,9 +23,11 @@ swaptiondeals = np.array([]) #Include all swaptions you want to include in the n
 #############################################################################
 
 ####Pricing Information
-fixedleginput = pd.read_excel(r'Input/Runfiles/Pricing/fixedlegs.xlsx', skiprows=2, index_col=0) #index_col=0 is essential. With this you can reference the deal with the number you assigned to it, instead of its index
-floatleginput = pd.read_excel(r'Input/Runfiles/Pricing/floatlegs.xlsx', skiprows=2, index_col=0)
-cmsleginput = pd.read_excel(r'Input/Runfiles/Pricing/cmslegs.xlsx', skiprows=2, index_col=0)
+dateparse = lambda x: x if isinstance(x, datetime.date) else datetime.datetime.strptime(x, '%d/%m/%Y') #if data is already datetime, don't change it, else convert it to datetime object
+fixedleginput = pd.read_excel(r'Input/Runfiles/Pricing/fixedlegs.xlsx', skiprows=2, index_col=0, parse_dates=['ValDate','StartDate', 'EndDate'], date_parser=dateparse) #index_col=0 is essential. With this you can reference the deal with the number you assigned to it, instead of its index
+floatleginput = pd.read_excel(r'Input/Runfiles/Pricing/floatlegs.xlsx', skiprows=2, index_col=0, parse_dates=['ValDate','StartDate', 'EndDate'], date_parser=dateparse)
+cmsleginput = pd.read_excel(r'Input/Runfiles/Pricing/cmslegs.xlsx', skiprows=2, index_col=0, parse_dates=['ValDate','StartDate', 'EndDate'], date_parser=dateparse)
+
 
 #Monte Carlo Information
 mcinput = pd.read_excel(r'Input/Runfiles/RiskDriverSimulation/MCDetails.xlsx')
@@ -119,7 +121,7 @@ net_future_mtm = floatpricing(floatlegs, net_future_mtm, floatleginput, timegrid
 net_future_mtm = cmslegpricing(cmslegs, net_future_mtm, cmsleginput, timegrid, shortrates, fxrates, simulation_amount)
 
 
-# # #stochastic discounting to today
+# #stochastic discounting to today
 net_discounted_mtm = stochastic_discount(net_future_mtm, shortrates['domestic'], timegrid, final_discount_curve)
 
 
@@ -145,5 +147,8 @@ output = pd.DataFrame({"Tenor [Y]": timegrid, "EE": EE, "EPE": EPE, "ENE":ENE} )
 
 #Write to Excel
 output.to_excel("Output/exposures.xlsx")
+
+
+print(EE[0])
 
 

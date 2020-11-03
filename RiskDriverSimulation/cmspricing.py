@@ -64,4 +64,4 @@ def cmslegpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_dict, fx
 
 		net_future_mtm += future_mtm
 
-		return(net_future_mtm)
+	return(net_future_mtm)

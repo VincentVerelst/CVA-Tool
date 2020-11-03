@@ -189,7 +189,10 @@ def create_payment_times(frequency, startdate, enddate, valdate):
 	frequency = frequency*12 #Frequency in excel is expressed in years, but frequency in schedule must be in months
 	paydates = ql.MakeSchedule(start_date, end_date, ql.Period(str(int(frequency)) + 'M'), calendar=cal, backwards=True, convention=ql.ModifiedFollowing)
 	schedule = np.array([ql_to_datetime(d) for d in paydates]) #convert the quantlib dates back to datetime dates
-	schedule = schedule[schedule > valdate] #remove all dates that are before the valuation date
+	if startdate <= valdate:
+		schedule = schedule[schedule > valdate] #remove all dates that are before the valuation date
+	else:
+		schedule = np.delete(schedule,0) #On the effective date only notional is exchanged, no payments happen, so take this into account when effective date is in the future
 	yearfrac = yf.yearfrac(valdate, schedule) #determine the yearfracs wrt the valdate
 	yearfrac = np.array(yearfrac) #convert to numpy array
 	return(yearfrac)
