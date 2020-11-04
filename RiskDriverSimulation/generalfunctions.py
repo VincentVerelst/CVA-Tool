@@ -64,16 +64,19 @@ def create_riskdrivers(irinput, fxinput, inflationinput, equityinput):
 	inflationdrivers = {}
 	for i in range(0, inflationinput.count(axis=1)[0]):
 		temp_name = inflationinput[inflationinput.columns[i]][0]
-		temp_real_rate = pd.read_excel(r'Input/Curves/' + inflationinput[inflationinput.columns[i]][1] + '.xlsx')
-		temp_nominal_rate = pd.read_excel(r'Input/Curves/' + inflationinput[inflationinput.columns[i]][2] + '.xlsx')
+		temp_currency = inflationinput[inflationinput.columns[i]][1]
+		temp_inflation_rate = pd.read_excel(r'Input/Curves/' + inflationinput[inflationinput.columns[i]][2] + '.xlsx')
 		temp_initial_index = inflationinput[inflationinput.columns[i]][3]
 		temp_real_volatility = pd.read_excel(r'Input/Volatility/' + inflationinput[inflationinput.columns[i]][4] + '.xlsx')
-		temp_nominal_volatility = pd.read_excel(r'Input/Volatility/' + inflationinput[inflationinput.columns[i]][5] + '.xlsx')
-		temp_index_volatility = pd.read_excel(r'Input/Volatility/' + inflationinput[inflationinput.columns[i]][6] + '.xlsx')
-		temp_real_mean_reversion = inflationinput[inflationinput.columns[i]][7]
-		temp_nominal_mean_reversion = inflationinput[inflationinput.columns[i]][8]
-		inflationdriver = InflationDriver(temp_name, temp_real_rate, temp_nominal_rate, temp_initial_index, temp_real_volatility, temp_nominal_volatility, temp_index_volatility, temp_real_mean_reversion, temp_nominal_mean_reversion)
-		inflationdrivers[inflationinput.columns[i]] = inflationdriver
+		temp_index_volatility = pd.read_excel(r'Input/Volatility/' + inflationinput[inflationinput.columns[i]][5] + '.xlsx')
+		temp_real_mean_reversion = inflationinput[inflationinput.columns[i]][6]
+		temp_nominal_rate = pd.read_excel(r'Input/Curves/' + irinput[temp_currency][1] + '.xlsx') #Read in the nominal interest rate as specified in the IR input
+		temp_nominal_volatility = pd.read_excel(r'Input/Volatility/' + irinput[temp_currency][2] + '.xlsx') #Read in the nominal interest rate volatility as specified in the IR input
+		temp_nominal_mean_reversion = irinput[temp_currency][3]  #Read in the nominal interest rate volatility as specified in the IR input
+		
+		
+		inflationdriver = InflationDriver(temp_name, temp_currency, temp_inflation_rate, temp_initial_index, temp_real_volatility, temp_real_mean_reversion, temp_nominal_rate, temp_nominal_volatility, temp_nominal_mean_reversion, temp_index_volatility)
+		inflationdrivers[temp_currency] = inflationdriver #Give the inflation drivers the same name as the name of the IR driver they correspond to
 
 	#Define all the equitydriver objects
 	equitydrivers = {}

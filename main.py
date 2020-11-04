@@ -94,61 +94,61 @@ if(num_rows != total or num_cols != total):
 irdrivers, fxdrivers, inflationdrivers, equitydrivers = create_riskdrivers(irinput, fxinput, inflationinput, equityinput)
 
 
-chol, rand_matrices = mc_simulate_hwbs(irdrivers, fxdrivers, inflationdrivers, equitydrivers, correlationmatrix, timegrid, simulation_amount)
+# chol, rand_matrices = mc_simulate_hwbs(irdrivers, fxdrivers, inflationdrivers, equitydrivers, correlationmatrix, timegrid, simulation_amount)
 
-shortrates, fxrates = ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxdrivers, rand_matrices, correlationmatrix)
-
-
-# avgdomrate = np.mean(shortrates[0].get_simulated_rates(), axis=0)
-# # avgforrate = np.mean(shortrates[1].get_simulated_rates(), axis=0)
-# # avgfxrate = np.mean(fxrates[0].get_simulated_rates(), axis=0)
-
-# # plt.plot(timegrid, avgdomrate)
-# # plt.show()
+# shortrates, fxrates = ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxdrivers, rand_matrices, correlationmatrix)
 
 
+# # avgdomrate = np.mean(shortrates[0].get_simulated_rates(), axis=0)
+# # # avgforrate = np.mean(shortrates[1].get_simulated_rates(), axis=0)
+# # # avgfxrate = np.mean(fxrates[0].get_simulated_rates(), axis=0)
 
-# # #############################################################################
-# # ########## Pricing ############
-# # #############################################################################
-
-net_future_mtm = np.zeros((simulation_amount, len(timegrid)))
-
-net_future_mtm = fixedpricing(fixedlegs, net_future_mtm, fixedleginput, timegrid, shortrates, fxrates, simulation_amount)
-
-net_future_mtm = floatpricing(floatlegs, net_future_mtm, floatleginput, timegrid, shortrates, fxrates, simulation_amount)
-
-net_future_mtm = cmslegpricing(cmslegs, net_future_mtm, cmsleginput, timegrid, shortrates, fxrates, simulation_amount)
+# # # plt.plot(timegrid, avgdomrate)
+# # # plt.show()
 
 
-# #stochastic discounting to today
-net_discounted_mtm = stochastic_discount(net_future_mtm, shortrates['domestic'], timegrid, final_discount_curve)
+
+# # # #############################################################################
+# # # ########## Pricing ############
+# # # #############################################################################
+
+# net_future_mtm = np.zeros((simulation_amount, len(timegrid)))
+
+# net_future_mtm = fixedpricing(fixedlegs, net_future_mtm, fixedleginput, timegrid, shortrates, fxrates, simulation_amount)
+
+# net_future_mtm = floatpricing(floatlegs, net_future_mtm, floatleginput, timegrid, shortrates, fxrates, simulation_amount)
+
+# net_future_mtm = cmslegpricing(cmslegs, net_future_mtm, cmsleginput, timegrid, shortrates, fxrates, simulation_amount)
 
 
-# # #############################################################################
-# # ########## Exposure Calculation + Writing to Excel ############
-# # #############################################################################
-
-#Expected Exposure
-EE = np.mean(net_discounted_mtm, axis=0)
-
-#Expected Positive Exposure
-PE = net_discounted_mtm.copy()
-PE[PE < 0] = 0
-EPE = np.mean(PE, axis=0)
-
-#Expected Negative Exposure
-NE = net_discounted_mtm.copy()
-NE[NE > 0] = 0
-ENE = np.mean(NE, axis=0)
-
-#Create a dataframe with all data
-output = pd.DataFrame({"Tenor [Y]": timegrid, "EE": EE, "EPE": EPE, "ENE":ENE} )
-
-#Write to Excel
-output.to_excel("Output/exposures.xlsx")
+# # #stochastic discounting to today
+# net_discounted_mtm = stochastic_discount(net_future_mtm, shortrates['domestic'], timegrid, final_discount_curve)
 
 
-print(EE[0])
+# # # #############################################################################
+# # # ########## Exposure Calculation + Writing to Excel ############
+# # # #############################################################################
+
+# #Expected Exposure
+# EE = np.mean(net_discounted_mtm, axis=0)
+
+# #Expected Positive Exposure
+# PE = net_discounted_mtm.copy()
+# PE[PE < 0] = 0
+# EPE = np.mean(PE, axis=0)
+
+# #Expected Negative Exposure
+# NE = net_discounted_mtm.copy()
+# NE[NE > 0] = 0
+# ENE = np.mean(NE, axis=0)
+
+# #Create a dataframe with all data
+# output = pd.DataFrame({"Tenor [Y]": timegrid, "EE": EE, "EPE": EPE, "ENE":ENE} )
+
+# #Write to Excel
+# output.to_excel("Output/exposures.xlsx")
+
+
+# print(EE[0])
 
 
