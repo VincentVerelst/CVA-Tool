@@ -90,12 +90,18 @@ def create_riskdrivers(irinput, fxinput, inflationinput, equityinput):
 	return(irdrivers, fxdrivers, inflationdrivers, equitydrivers)
 
 
-def ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxdrivers, random_matrices, correlationmatrix):
+def ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxdrivers, inflationdrivers, random_matrices, correlationmatrix):
 	
 	deltaT = np.diff(timegrid)
+	irdrivers_list = list(irdrivers) #list of the keys ('domestic', 'foreign1', etc) of the irdrivers dictionary, used to find indices in correlation matrix
+	fxdrivers_list = list(irdrivers)
+	inflationdrivers_list = list(inflationdrivers)
 	#deltaT = timegrid[2] - timegrid[1] #determine time intervals of timegrid
 	n_irdrivers = len(irdrivers)
 	n_fxdrivers = len(fxdrivers)
+	n_inflationdrivers = len(inflationdrivers)
+
+	#IR DRIVERS
 
 	#Calculate deterministic beta factors so that r(t) = x(t) + beta(t), with x(t) ornstein uhlenbeck process
 	betas = {}
@@ -134,7 +140,8 @@ def ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxdrivers, random_mat
 		matrix_index += 1
 
 	
-	#simulate the spot FX rates
+	#FX DRIVERS
+
 	fxspot_rates = {}
 	for j in fxdrivers:
 		spotfx = np.zeros((simulation_amount, len(timegrid)))
@@ -148,14 +155,59 @@ def ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxdrivers, random_mat
 		
 		matrix_index += 1
 
-	return(short_rates, fxspot_rates)
+	#INFLATION DRIVERS
+
+	real_betas = {}
+	for i in inflationdrivers:
+		beta = inflationdrivers[i].get_beta(timegrid)
+		real_betas[i] = beta
+
+	inflation_rates = {}
+	for j in inflationdrivers:
+		real_ornstein_uhlenbeck = np.zeros((simulation_amount, len(timegrid)))
+		sim_real_short_rates  = np.zeros((simulation_amount, len(timegrid)))
+		sim_real_short_rates[:,0] = betas[j][0]
+
+		inflationindex = np.zeros((simulation_amount, len(timegrid)))
+		inflationindex[:,0] = inflationdrivers[j].get_initial_index()
+		#if domestic, then only drift adjustment for real --> nominal measure and no adjustment in inflation process
+		if j == 'domestic':
+			for i in range(0, len(timegrid) - 1):
+				#Simulate the real short rate
+				#Exact solution scheme for x(t)
+				real_ornstein_uhlenbeck[:,i+1] = real_ornstein_uhlenbeck[:,i] * np.exp(- inflationdrivers[j].get_real_mean_reversion() * deltaT[i]) + (inflationdrivers[j].get_real_volatility(timegrid[i+1]) * inflationdrivers[j].get_inflation_volatility(timegrid[i+1]) * correlationmatrix[matrix_index][1 + matrix_index]/inflationdrivers[j].get_real_mean_reversion()) * (np.exp(- inflationdrivers[j].get_real_mean_reversion() * deltaT[i]) - 1)  + inflationdrivers[j].get_real_volatility(timegrid[i+1]) * random_matrices[matrix_index][:,i] * np.sqrt((1 - np.exp(-2 * inflationdrivers[j].get_real_mean_reversion() * deltaT[i]))/(2 * inflationdrivers[j].get_real_mean_reversion()))
+				sim_real_short_rates[:, i+1] = real_ornstein_uhlenbeck[:,i+1] + real_betas[j][i+1]
+
+			matrix_index += 1
+			#simulate the inflation index with FX process between nominal and real short rate
+			for i in range(0, len(timegrid) - 1):
+				inflationindex[:,i+1] = inflationindex[:,i] + inflationindex[:,i] * ( (short_rates[j].get_simulated_rates()[:,i+1] - sim_real_short_rates[:,i+1]) * deltaT[i] + inflationdrivers[j].get_inflation_volatility(timegrid[i+1]) * np.sqrt(deltaT[i]) * random_matrices[matrix_index][:,i] )
+			
+			matrix_index += 1
+
+		#if foreign, then two drift adjustments in real process: real --> nominal and real --> domestic and one drift adjustment in inflation process: foreign --> domestic
+		else:
+			for i in range(0, len(timegrid) - 1):
+				#Exact solution scheme for x(t)
+				real_ornstein_uhlenbeck[:,i+1] = real_ornstein_uhlenbeck[:,i] * np.exp(- inflationdrivers[j].get_real_mean_reversion() * deltaT[i]) + ((inflationdrivers[j].get_real_volatility(timegrid[i+1]) * inflationdrivers[j].get_inflation_volatility(timegrid[i+1]) * correlationmatrix[matrix_index][1 + matrix_index] + inflationdrivers[j].get_real_volatility(timegrid[i+1]) * fxdrivers[j].get_volatility(timegrid[i+1]) * correlationmatrix[matrix_index][n_irdrivers + fxdrivers_list.index(j)] )/inflationdrivers[j].get_real_mean_reversion()) * (np.exp(- inflationdrivers[j].get_real_mean_reversion() * deltaT[i]) - 1)  + inflationdrivers[j].get_real_volatility(timegrid[i+1]) * random_matrices[matrix_index][:,i] * np.sqrt((1 - np.exp(-2 * inflationdrivers[j].get_real_mean_reversion() * deltaT[i]))/(2 * inflationdrivers[j].get_real_mean_reversion()))
+				sim_real_short_rates[:, i+1] = real_ornstein_uhlenbeck[:,i+1] + real_betas[j][i+1]
+
+			matrix_index += 1
+			#simulate the inflation index with FX process between nominal and real short rate
+			for i in range(0, len(timegrid) - 1):
+				inflationindex[:,i+1] = inflationindex[:,i] + inflationindex[:,i] * ( (short_rates[j].get_simulated_rates()[:,i+1] - sim_real_short_rates[:,i+1] - inflationdrivers[j].get_inflation_volatility(timegrid[i+1]) * fxdrivers[j].get_volatility(timegrid[i+1])  * correlationmatrix[matrix_index][n_irdrivers + fxdrivers_list.index(j)]) * deltaT[i] + inflationdrivers[j].get_inflation_volatility(timegrid[i+1]) * np.sqrt(deltaT[i]) * random_matrices[matrix_index][:,i] )
+			
+			matrix_index += 1
+
+
+	return(short_rates, fxspot_rates, matrix_index)
 
 
 def mc_simulate_hwbs(irdrivers, fxdrivers, inflationdrivers, equitydrivers, correlationmatrix, timegrid, simulation_amount):
 	#Count riskdrivers
 	n_irdrivers = len(irdrivers)
 	n_fxdrivers = len(fxdrivers)
-	n_inflationdrivers = len(inflationdrivers)
+	n_inflationdrivers = 2*len(inflationdrivers)  #each inflation drivers contains two risk drivers: real rate and inflation index
 	n_equitydrivers = len(equitydrivers)
 	n_totaldrivers = n_irdrivers + n_fxdrivers + n_inflationdrivers + n_equitydrivers
 

@@ -111,6 +111,9 @@ class InflationDriver:
     def get_inflation_rate(self):
         return self.inflation_rate
 
+    def get_initial_index(self):
+        return self.initial_index
+
     def get_nominal_volatility_frame(self):
         return self.nominal_volatility #to give to simulated object afterwards
 
@@ -147,9 +150,9 @@ class InflationDriver:
     #For simulation only real instand forward rates are needed since nominal are already handled in the IR driver class
     def get_inst_fwd_rates(self, times):
         self.timedifferences = np.diff(times) #determine time intervals of timegrid, len(timedifferences) = len(times) - 1
-        self.discount_factors = np.power(1 + self.real_rate(times), -times)
+        self.discount_factors = np.power(1 + self.get_real_rate(times), -times)
         self.instantaneous_forward_rates = (self.discount_factors[0:(len(self.discount_factors)-1)] / self.discount_factors[1:len(self.discount_factors)] - 1) / self.timedifferences #Approximate intstan. fwd rates with standard forward rates
-        self.instantaneous_forward_rates = np.append(np.array(self.get_firstshortrate()), self.instantaneous_forward_rates) #Approximate first inst fwd rate (= first short rate) with first zero rate
+        self.instantaneous_forward_rates = np.append(np.array(self.get_first_real_short_rate()), self.instantaneous_forward_rates) #Approximate first inst fwd rate (= first short rate) with first zero rate
         return self.instantaneous_forward_rates
 
     #Same story: only real beta needed, nominal is handled in IR driver class

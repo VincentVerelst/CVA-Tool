@@ -81,10 +81,10 @@ correlationmatrix = correlationmatrix.drop(correlationmatrix.columns[0], axis=1)
 correlationmatrix = correlationmatrix.values #Convert to numpy array (matrix)
 
 num_rows, num_cols = correlationmatrix.shape
-total = iramount + fxamount + inflationamount + equityamount 
+total = iramount + fxamount + 2*inflationamount + equityamount #2* inflation amount because every inflation drivers contains two extra risk drivers: the real rate and the inflation index 
 #Check if dimensions of correlation matrix are correct
 if(num_rows != total or num_cols != total): 
-	print("Error: enter correlation matrix with correct dimensions: (2n-1)x(2n-1), with n = amount of risk drivers")
+	print("Error: enter correlation matrix with correct dimensions: N x N, with N = amount of risk drivers")
 	exit()
 
 #############################################################################
@@ -94,11 +94,13 @@ if(num_rows != total or num_cols != total):
 irdrivers, fxdrivers, inflationdrivers, equitydrivers = create_riskdrivers(irinput, fxinput, inflationinput, equityinput)
 
 
-# chol, rand_matrices = mc_simulate_hwbs(irdrivers, fxdrivers, inflationdrivers, equitydrivers, correlationmatrix, timegrid, simulation_amount)
+chol, rand_matrices = mc_simulate_hwbs(irdrivers, fxdrivers, inflationdrivers, equitydrivers, correlationmatrix, timegrid, simulation_amount)
 
-# shortrates, fxrates = ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxdrivers, rand_matrices, correlationmatrix)
+print(len(rand_matrices))
 
+shortrates, fxrates, matrix_index = ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxdrivers, inflationdrivers, rand_matrices, correlationmatrix)
 
+print(matrix_index)
 # # avgdomrate = np.mean(shortrates[0].get_simulated_rates(), axis=0)
 # # # avgforrate = np.mean(shortrates[1].get_simulated_rates(), axis=0)
 # # # avgfxrate = np.mean(fxrates[0].get_simulated_rates(), axis=0)
