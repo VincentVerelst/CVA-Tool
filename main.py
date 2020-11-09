@@ -98,9 +98,10 @@ chol, rand_matrices = mc_simulate_hwbs(irdrivers, fxdrivers, inflationdrivers, e
 
 print(len(rand_matrices))
 
-shortrates, fxrates, matrix_index = ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxdrivers, inflationdrivers, rand_matrices, correlationmatrix)
+shortrates, fxrates, inflationrates = ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxdrivers, inflationdrivers, rand_matrices, correlationmatrix)
 
-print(matrix_index)
+
+
 # # avgdomrate = np.mean(shortrates[0].get_simulated_rates(), axis=0)
 # # # avgforrate = np.mean(shortrates[1].get_simulated_rates(), axis=0)
 # # # avgfxrate = np.mean(fxrates[0].get_simulated_rates(), axis=0)

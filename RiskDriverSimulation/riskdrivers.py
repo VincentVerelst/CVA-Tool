@@ -257,3 +257,120 @@ class FXRates:
 
     def get_volatility(self, time):
         return self.volatilityfun(time) 
+
+class InflationRates:
+    def __init__(self, name, simulated_nominal_rates, simulated_real_rates, simulated_inflation_index, nominal_curve, real_curve, nominal_volatility, real_volatility, inflation_volatility, nominal_mean_reversion, real_mean_reversion, nominal_inst_fwd_rates, real_inst_fwd_rates, timegrid):
+        self.name = name
+        self.simulated_nominal_rates = simulated_nominal_rates
+        self.simulated_real_rates = simulated_real_rates
+        self.simulated_inflation_index = simulated_inflation_index
+        self.nominal_curve = nominal_curve
+        self.real_curve = real_curve
+        self.nominal_volatility = nominal_volatility
+        self.real_volatility = real_volatility
+        self.inflation_volatility = inflation_volatility
+        self.nominal_mean_reversion = nominal_mean_reversion
+        self.real_mean_reversion = real_mean_reversion 
+        self.nominal_inst_fwd_rates = nominal_inst_fwd_rates
+        self.real_inst_fwd_rates = real_inst_fwd_rates
+        self.timegrid = timegrid 
+
+        self.nominal_volatility_fun = interpolate.interp1d(self.nominal_volatility['TimeToZero'], self.nominal_volatility['sigma'], 'next', fill_value='extrapolate') #piecewise constant interpolation of the volatility
+        self.real_volatility_fun = interpolate.interp1d(self.real_volatility['TimeToZero'], self.real_volatility['sigma'], 'next', fill_value='extrapolate') #piecewise constant interpolation of the volatility
+        self.inflation_volatility_fun = interpolate.interp1d(self.inflation_volatility['TimeToZero'], self.inflation_volatility['sigma'], 'next', fill_value='extrapolate') #piecewise constant interpolation of the volatility
+
+        self.nominal_rate_fun = interpolate.interp1d(self.nominal_curve['TimeToZero'], self.nominal_curve['ZeroRate'], 'linear', fill_value='extrapolate') #linear interpolation of the zero rate
+        self.real_rate_fun = interpolate.interp1d(self.real_curve['TimeToZero'], self.real_curve['ZeroRate'], 'linear', fill_value='extrapolate') #linear interpolation of the zero rate
+    
+    def get_name(self):
+        return self.name
+
+    def get_nominal_curve(self):
+        return self.nominal_curve
+
+    def get_real_curve(self):
+        return self.real_curve
+        
+    def get_simulated_nominal_rates(self):
+        return self.simulated_nominal_rates
+
+    def get_simulated_real_rates(self):
+        return self.simulated_real_rates
+
+    def get_simulated_inflation_index(self):
+        return self.simulated_inflation_index
+
+    def get_nominal_volatility(self, times):
+        return self.nominal_volatility_fun(times)
+
+    def get_real_volatility(self, times):
+        return self.real_volatility_fun(times) 
+
+    def get_inflation_volatility(self, times):
+        return self.inflation_volatility_fun(times)
+
+    def get_nominal_rate(self, times):
+        return self.nominal_rate_fun(times)
+
+    def get_real_rate(self, times):
+        return self.real_rate_fun(times)
+
+    def get_stochastic_affine_nominal_discount_factors(self, times, n):
+        #ADD INST FWD RATES on timegrid as input 
+        #times = future times on which you want to calculate stoch DFs (future times as seen from today!)
+        #n = point in simulation, so right now we are on time = timegrid[n], so all times must be times > timegrid[n]
+        libor_zc_times = self.get_nominal_rate(times)
+        libor_df_times = np.power((1 + libor_zc_times), -times)
+        libor_zc_n = self.get_nominal_rate(self.timegrid[n])
+        libor_df_n = np.power((1 + libor_zc_n), -self.timegrid[n]) 
+        #Calculate ln(a(t,T))
+        first_term = np.log(libor_df_times / libor_df_n)
+        second_term = self.nominal_inst_fwd_rates[n] * (1 / self.nominal_mean_reversion) * (1 - np.exp(-self.nominal_mean_reversion * (times - self.timegrid[n])))
+        third_term = -0.5 * np.power(self.get_nominal_volatility(times), 2) * np.power((1 / self.nominal_mean_reversion) * (1 - np.exp(-self.nominal_mean_reversion * (times - self.timegrid[n]))), 2) * (1 / (2 * self.nominal_mean_reversion)) * (1 - np.exp(- 2 * self.nominal_mean_reversion * self.timegrid[n]))
+        
+        lna = first_term + second_term + third_term
+        lna_matrix = np.tile(lna, (np.shape(self.simulated_nominal_rates)[0],1)) #Repeat the ln(a) vector (which has len = len(times)) in a matrix with amount of rows equal to simulated_short rates rows = simulation_amount
+
+        b_factor = (1 / self.nominal_mean_reversion) * (1 - np.exp(- self.nominal_mean_reversion * (times - self.timegrid[n]))) #b(t,T)
+        b_factor_matrix = np.transpose(np.tile(b_factor, (np.shape(self.simulated_nominal_rates)[0],1)))#Same as for lna: create a matrix with repeated b_factor in rows, but transposed because we still have to multiply it with array
+
+        stoch_df_matrix = np.exp(lna_matrix - np.transpose(b_factor_matrix * self.simulated_nominal_rates[:,n]))
+
+        return(stoch_df_matrix)
+
+    def get_stochastic_affine_real_discount_factors(self, times, n):
+        #ADD INST FWD RATES on timegrid as input 
+        #times = future times on which you want to calculate stoch DFs (future times as seen from today!)
+        #n = point in simulation, so right now we are on time = timegrid[n], so all times must be times > timegrid[n]
+        libor_zc_times = self.get_real_rate(times)
+        libor_df_times = np.power((1 + libor_zc_times), -times)
+        libor_zc_n = self.get_real_rate(self.timegrid[n])
+        libor_df_n = np.power((1 + libor_zc_n), -self.timegrid[n]) 
+        #Calculate ln(a(t,T))
+        first_term = np.log(libor_df_times / libor_df_n)
+        second_term = self.real_inst_fwd_rates[n] * (1 / self.real_mean_reversion) * (1 - np.exp(-self.real_mean_reversion * (times - self.timegrid[n])))
+        third_term = -0.5 * np.power(self.get_real_volatility(times), 2) * np.power((1 / self.real_mean_reversion) * (1 - np.exp(-self.real_mean_reversion * (times - self.timegrid[n]))), 2) * (1 / (2 * self.real_mean_reversion)) * (1 - np.exp(- 2 * self.real_mean_reversion * self.timegrid[n]))
+        
+        lna = first_term + second_term + third_term
+        lna_matrix = np.tile(lna, (np.shape(self.simulated_real_rates)[0],1)) #Repeat the ln(a) vector (which has len = len(times)) in a matrix with amount of rows equal to simulated_short rates rows = simulation_amount
+
+        b_factor = (1 / self.real_mean_reversion) * (1 - np.exp(- self.real_mean_reversion * (times - self.timegrid[n]))) #b(t,T)
+        b_factor_matrix = np.transpose(np.tile(b_factor, (np.shape(self.simulated_real_rates)[0],1)))#Same as for lna: create a matrix with repeated b_factor in rows, but transposed because we still have to multiply it with array
+
+        stoch_df_matrix = np.exp(lna_matrix - np.transpose(b_factor_matrix * self.simulated_real_rates[:,n]))
+
+        return(stoch_df_matrix)
+
+    def get_stochastic_inflation_rates(self, times, n):
+        #Stochastic inflation rates are (by definition) the difference between the stochastic nominal zero rate and the stochastic real zero rate
+        #times = future times on which you want to calculate stoch DFs (future times as seen from today!)
+        #n = point in simulation, so right now we are on time = timegrid[n], so all times must be times > timegrid[n]
+
+        stoch_nominal_discount_factors = self.get_stochastic_affine_nominal_discount_factors(times, n)
+        stoch_real_discount_factors = self.get_stochastic_affine_real_discount_factors(times, n)
+
+        stoch_nominal_zero_rates = np.power(1 / stoch_nominal_discount_factors, 1 / (times - self.timegrid[n])) - 1 #convert original DF's to zero rates
+        stoch_real_zero_rates = np.power(1 / stoch_real_discount_factors, 1 / (times - self.timegrid[n])) - 1 #convert original DF's to zero rates
+
+        stoch_inflation_rates = stoch_nominal_zero_rates - stoch_real_zero_rates 
+        return(stoch_inflation_rates)

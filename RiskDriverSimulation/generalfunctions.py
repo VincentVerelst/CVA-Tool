@@ -159,14 +159,14 @@ def ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxdrivers, inflationd
 
 	real_betas = {}
 	for i in inflationdrivers:
-		beta = inflationdrivers[i].get_beta(timegrid)
-		real_betas[i] = beta
+		real_beta = inflationdrivers[i].get_beta(timegrid)
+		real_betas[i] = real_beta
 
 	inflation_rates = {}
 	for j in inflationdrivers:
 		real_ornstein_uhlenbeck = np.zeros((simulation_amount, len(timegrid)))
 		sim_real_short_rates  = np.zeros((simulation_amount, len(timegrid)))
-		sim_real_short_rates[:,0] = betas[j][0]
+		sim_real_short_rates[:,0] = real_betas[j][0]
 
 		inflationindex = np.zeros((simulation_amount, len(timegrid)))
 		inflationindex[:,0] = inflationdrivers[j].get_initial_index()
@@ -185,6 +185,8 @@ def ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxdrivers, inflationd
 			
 			matrix_index += 1
 
+			inflation_rates_object = InflationRates(inflationdrivers[j].get_name(), short_rates[j].get_simulated_rates(), sim_real_short_rates, inflationindex, inflationdrivers[j].get_nominal_yieldcurve(), inflationdrivers[j].get_real_yieldcurve(), inflationdrivers[j].get_nominal_volatility_frame(), inflationdrivers[j].get_real_volatility_frame(), inflationdrivers[j].get_inflation_volatility_frame(), inflationdrivers[j].get_nominal_mean_reversion(), inflationdrivers[j].get_real_mean_reversion(), irdrivers[j].get_inst_fwd_rates(timegrid), inflationdrivers[j].get_inst_fwd_rates(timegrid), timegrid)
+			inflation_rates[j] = inflation_rates_object
 		#if foreign, then two drift adjustments in real process: real --> nominal and real --> domestic and one drift adjustment in inflation process: foreign --> domestic
 		else:
 			for i in range(0, len(timegrid) - 1):
@@ -199,8 +201,10 @@ def ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxdrivers, inflationd
 			
 			matrix_index += 1
 
+			inflation_rates_object = InflationRates(inflationdrivers[j].get_name(), short_rates[j].get_simulated_rates(), sim_real_short_rates, inflationindex, inflationdrivers[j].get_nominal_yieldcurve(), inflationdrivers[j].get_real_yieldcurve(), inflationdrivers[j].get_nominal_volatility_frame(), inflationdrivers[j].get_real_volatility_frame(), inflationdrivers[j].get_inflation_volatility_frame(), inflationdrivers[j].get_nominal_mean_reversion(), inflationdrivers[j].get_real_mean_reversion(), irdrivers[j].get_inst_fwd_rates(timegrid), inflationdrivers[j].get_inst_fwd_rates(timegrid), timegrid)
+			inflation_rates[j] = inflation_rates_object 
 
-	return(short_rates, fxspot_rates, matrix_index)
+	return(short_rates, fxspot_rates, inflation_rates)
 
 
 def mc_simulate_hwbs(irdrivers, fxdrivers, inflationdrivers, equitydrivers, correlationmatrix, timegrid, simulation_amount):
