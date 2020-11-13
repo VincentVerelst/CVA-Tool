@@ -11,10 +11,10 @@ from RiskDriverSimulation import *
 ########## User Defined Data ############
 #############################################################################
 #All deals
-fixedlegs = np.arange(1,18) #Include all fixed-floating swaps you want to include in the netting set
-floatlegs = np.arange(1,16) #Include all fixed-fixed swaps you want to include in the netting set
-cmslegs = np.array([1,2])#np.array([1,2])
-fxforwarddeals = np.array([]) #Include all FX Forwards you want to include in the netting set
+fixedlegs = np.array([]) #Include all fixed-floating swaps you want to include in the netting set
+floatlegs = np.array([]) #Include all fixed-fixed swaps you want to include in the netting set
+cmslegs = np.array([])#np.array([1,2])
+zcinflationlegs = np.array([1])
 swaptiondeals = np.array([]) #Include all swaptions you want to include in the netting set
 
 
@@ -27,7 +27,7 @@ dateparse = lambda x: x if isinstance(x, datetime.date) else datetime.datetime.s
 fixedleginput = pd.read_excel(r'Input/Runfiles/Pricing/fixedlegs.xlsx', skiprows=2, index_col=0, parse_dates=['ValDate','StartDate', 'EndDate'], date_parser=dateparse) #index_col=0 is essential. With this you can reference the deal with the number you assigned to it, instead of its index
 floatleginput = pd.read_excel(r'Input/Runfiles/Pricing/floatlegs.xlsx', skiprows=2, index_col=0, parse_dates=['ValDate','StartDate', 'EndDate'], date_parser=dateparse)
 cmsleginput = pd.read_excel(r'Input/Runfiles/Pricing/cmslegs.xlsx', skiprows=2, index_col=0, parse_dates=['ValDate','StartDate', 'EndDate'], date_parser=dateparse)
-
+zcinflationleginput = pd.read_excel(r'Input/Runfiles/Pricing/zcinflationlegs.xlsx', skiprows=2, index_col=0, parse_dates=['ValDate','StartDate', 'EndDate'], date_parser=dateparse)
 
 #Monte Carlo Information
 mcinput = pd.read_excel(r'Input/Runfiles/RiskDriverSimulation/MCDetails.xlsx')
@@ -58,7 +58,7 @@ final_discount_curve = pd.read_excel(r'Input/Curves/' + irinput['domestic'][4] +
 
 #Read in FX
 fxinput = pd.read_excel(r'Input/Runfiles/RiskDriverSimulation/FXinput.xlsx')
-fxinput = fxinput.dropna(1) #Drops all columns with NA values
+fxinput = fxinput.dropna(1, how='all') #Drops all columns with NA values
 fxinput = fxinput.drop(fxinput.columns[0], axis=1) #Drops first column
 fxamount = fxinput.count(1)[0] #Count the amount of currencies
 if(fxamount != iramount - 1):
@@ -68,12 +68,12 @@ if(fxamount != iramount - 1):
 #Read in inflation (which is a combo of rates and FX)
 inflationinput = pd.read_excel(r'Input/Runfiles/RiskDriverSimulation/InflationInput.xlsx')
 inflationinput = inflationinput.drop(inflationinput.columns[0], axis=1) #Drops first column
-inflationinput = inflationinput.dropna(1) #Drops all columns with NA values
+inflationinput = inflationinput.dropna(1, how='all') #Drops all columns with NA values
 inflationamount = inflationinput.count(1)[0] #Count the amount of currencies
 
 equityinput = pd.read_excel(r'Input/Runfiles/RiskDriverSimulation/EquityInput.xlsx')
 equityinput = equityinput.drop(equityinput.columns[0], axis=1) #Drops first column
-equityinput = equityinput.dropna(1) #Drops all columns with NA values
+equityinput = equityinput.dropna(1, how='all') #Drops all columns with NA values
 equityamount = equityinput.count(1)[0] #Count the amount of currencies
 
 correlationmatrix = pd.read_excel(r'Input/Correlation/' + correlation +  '.xlsx', header=None,skiprows=1)
@@ -96,7 +96,7 @@ irdrivers, fxdrivers, inflationdrivers, equitydrivers = create_riskdrivers(irinp
 
 chol, rand_matrices = mc_simulate_hwbs(irdrivers, fxdrivers, inflationdrivers, equitydrivers, correlationmatrix, timegrid, simulation_amount)
 
-print(len(rand_matrices))
+
 
 shortrates, fxrates, inflationrates = ir_fx_simulate(timegrid, simulation_amount, irdrivers, fxdrivers, inflationdrivers, rand_matrices, correlationmatrix)
 
@@ -115,7 +115,7 @@ shortrates, fxrates, inflationrates = ir_fx_simulate(timegrid, simulation_amount
 # # # ########## Pricing ############
 # # # #############################################################################
 
-# net_future_mtm = np.zeros((simulation_amount, len(timegrid)))
+net_future_mtm = np.zeros((simulation_amount, len(timegrid)))
 
 # net_future_mtm = fixedpricing(fixedlegs, net_future_mtm, fixedleginput, timegrid, shortrates, fxrates, simulation_amount)
 
@@ -123,7 +123,9 @@ shortrates, fxrates, inflationrates = ir_fx_simulate(timegrid, simulation_amount
 
 # net_future_mtm = cmslegpricing(cmslegs, net_future_mtm, cmsleginput, timegrid, shortrates, fxrates, simulation_amount)
 
+net_future_mtm = zcinflationpricing(zcinflationlegs, net_future_mtm, zcinflationleginput, timegrid, shortrates, fxrates, inflationrates, simulation_amount)
 
+print(net_future_mtm)
 # # #stochastic discounting to today
 # net_discounted_mtm = stochastic_discount(net_future_mtm, shortrates['domestic'], timegrid, final_discount_curve)
 

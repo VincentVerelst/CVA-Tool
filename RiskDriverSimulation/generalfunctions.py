@@ -7,6 +7,12 @@ import yearfrac as yf #Requires "pip install yearfrac" in Anaconda prompt
 from scipy import interpolate
 from .riskdrivers import *
 
+def better_yearfrac(x, y):
+	#determines the yearfrac between two datetime dates, but also returns negative if y < x instead of error
+	if y >= x:
+		return(yf.yearfrac(x,y))
+	else:
+		return(-1*yf.yearfrac(y,x))
 #Function to check if a matrix is positive definite (which is a requirement for Cholesky decomposition)
 def is_positive_definite(x):
 	return np.all(np.linalg.eigvals(x) > 0) #All eigenvalues must be larger than zero 
@@ -438,3 +444,7 @@ def atm_swap_rate(times, tenor, timegrid, n, fixed_freq, float_freq, shortrates_
 		atm_rates[:,i] = atm_rate #nth column of the matrix to be filled  with the stochastic atm swap rates
 
 	return(atm_rates)
+
+
+def yoy_inflation_rates(paytimes, lag, timegrid, n, inflationrates):
+	pass
