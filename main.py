@@ -14,7 +14,8 @@ from RiskDriverSimulation import *
 fixedlegs = np.array([]) #Include all fixed-floating swaps you want to include in the netting set
 floatlegs = np.array([]) #Include all fixed-fixed swaps you want to include in the netting set
 cmslegs = np.array([])#np.array([1,2])
-zcinflationlegs = np.array([1])
+zcinflationlegs = np.array([])
+yoyinflationlegs = np.array([1])
 swaptiondeals = np.array([]) #Include all swaptions you want to include in the netting set
 
 
@@ -28,6 +29,7 @@ fixedleginput = pd.read_excel(r'Input/Runfiles/Pricing/fixedlegs.xlsx', skiprows
 floatleginput = pd.read_excel(r'Input/Runfiles/Pricing/floatlegs.xlsx', skiprows=2, index_col=0, parse_dates=['ValDate','StartDate', 'EndDate'], date_parser=dateparse)
 cmsleginput = pd.read_excel(r'Input/Runfiles/Pricing/cmslegs.xlsx', skiprows=2, index_col=0, parse_dates=['ValDate','StartDate', 'EndDate'], date_parser=dateparse)
 zcinflationleginput = pd.read_excel(r'Input/Runfiles/Pricing/zcinflationlegs.xlsx', skiprows=2, index_col=0, parse_dates=['ValDate','StartDate', 'EndDate'], date_parser=dateparse)
+yoyinflationleginput = pd.read_excel(r'Input/Runfiles/Pricing/yoyinflationlegs.xlsx', skiprows=2, index_col=0, parse_dates=['ValDate','StartDate', 'EndDate'], date_parser=dateparse)
 
 #Monte Carlo Information
 mcinput = pd.read_excel(r'Input/Runfiles/RiskDriverSimulation/MCDetails.xlsx')
@@ -123,9 +125,11 @@ net_future_mtm = np.zeros((simulation_amount, len(timegrid)))
 
 # net_future_mtm = cmslegpricing(cmslegs, net_future_mtm, cmsleginput, timegrid, shortrates, fxrates, simulation_amount)
 
-net_future_mtm = zcinflationpricing(zcinflationlegs, net_future_mtm, zcinflationleginput, timegrid, shortrates, fxrates, inflationrates, simulation_amount)
+#net_future_mtm = zcinflationpricing(zcinflationlegs, net_future_mtm, zcinflationleginput, timegrid, shortrates, fxrates, inflationrates, simulation_amount)
 
-print(net_future_mtm)
+net_future_mtm = yoyinflationpricing(yoyinflationlegs, net_future_mtm, yoyinflationleginput, timegrid, shortrates, fxrates, inflationrates, simulation_amount)
+
+print(net_future_mtm[1,:])
 # # #stochastic discounting to today
 # net_discounted_mtm = stochastic_discount(net_future_mtm, shortrates['domestic'], timegrid, final_discount_curve)
 

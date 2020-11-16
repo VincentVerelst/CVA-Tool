@@ -446,5 +446,21 @@ def atm_swap_rate(times, tenor, timegrid, n, fixed_freq, float_freq, shortrates_
 	return(atm_rates)
 
 
-def yoy_inflation_rates(paytimes, lag, timegrid, n, inflationrates):
-	pass
+def stoch_fwd_inflation_index(stoch_fwd_inflation_indices, times, timegrid, n, inflationrates, lag):
+	#stoch_inflation_indeces has amount of columns equal to length(times)
+	#This function will calculate the stochastic future inflation indices, future relative to timegrid[n]
+	future_times = times[(times - lag) > timegrid[n]]
+
+	if(len(future_times)==0):
+		return(stoch_fwd_inflation_indices) #no more calculation has to be done if we are past last point of reset times in the simulation
+
+	else:
+		#determine the stochastic inflation rates on the future times
+		stoch_inflation_zc = inflationrates.get_stochastic_inflation_rates(future_times, n)
+		#stochastic spot inflation indices at time timegrid[n] are the nth column of the simulated inflation indices
+		stoch_spot_inflation_indices = inflationrates.get_simulated_inflation_index()[:,n]
+		#stochastic forward inflation indices
+		stoch_future_fwd_inflation_indices = np.transpose(stoch_spot_inflation_indices * np.transpose(np.power(1 + stoch_inflation_zc, future_times - timegrid[n])))
+		#Replace the final columns of the stoch fwd inflation indices with the  newly calculated future stoch fwd inflation rates
+		stoch_fwd_inflation_indices[:, (stoch_fwd_inflation_indices.shape[1] - len(future_times)):stoch_fwd_inflation_indices.shape[1]] = stoch_future_fwd_inflation_indices 
+		return(stoch_fwd_inflation_indices)
