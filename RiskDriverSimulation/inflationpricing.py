@@ -13,11 +13,11 @@ def zcinflationpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_dic
 		paytime = better_yearfrac(leg_input['ValDate'][leg], leg_input['EndDate'][leg])
 		lag = leg_input['Lag'][leg]
 		notional = leg_input['Notional'][leg]
+		notionalexchange = leg_input['NotionalExchangeEnd'][leg]
 
 		#select the right risk driver object from the dictionaries
 		currency = leg_input['Currency'][leg]
 		shortrates = shortrates_dict[currency]
-		fxrates = fxrates_dict[currency]
 		inflationrates = inflationrates_dict[currency]
 
 		#the base inflation index is set to the user input, if however the startdate is in the future, this will be overridden in the for loop
@@ -47,12 +47,16 @@ def zcinflationpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_dic
 			#include potential basis to the discount curve
 			stochastic_discount_factor = include_yield_curve_basis(paytime, shortrates.get_yield_curve(), pd.read_excel(r'Input/Curves/' + leg_input['Discount Curve'][leg] +  '.xlsx'), timegrid, n, stochastic_discount_factor_sr)
 
-			stochastic_value = (stochastic_inflation_index_paytime / stochastic_inflation_index_starttime) * notional * stochastic_discount_factor
+			stochastic_value = (stochastic_inflation_index_paytime / stochastic_inflation_index_starttime - 1) * notional * stochastic_discount_factor
+			if notionalexchange == 'yes':
+				stochastic_value += notional * stochastic_discount_factor #Add notional to the final value if the notional is exchanged
+
 			future_mtm[:,n] = np.sum(stochastic_value, axis=1) #sum is over one element, since ZC inflation is only one payment by definition, however this step is necessary for dimensions to match
 
 		
 		#convert with stochastic spot FX to domestic currency if it's a foreign leg 
 		if currency != 'domestic':
+			fxrates = fxrates_dict[currency]
 			future_mtm = future_mtm * fxrates.get_simulated_rates()
 
 		net_future_mtm += future_mtm
@@ -60,7 +64,7 @@ def zcinflationpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_dic
 
 	return(net_future_mtm)
 
-def yoyvalue(notional, spread, discount_curve, timegrid, n, shortrates, futurepaytimes, stoch_fwd_inflation_index_one, stoch_fwd_inflation_index_two, notionalexchange):
+def yoyvalue(notional, spread, leverage, discount_curve, timegrid, n, shortrates, futurepaytimes, stoch_fwd_inflation_index_one, stoch_fwd_inflation_index_two, notionalexchange):
 	#Calculate the stochastic discount factors on the future paytimes
 	sr_stoch_discount_factors = shortrates.get_stochastic_affine_discount_factors(futurepaytimes, n)
 	leg_stoch_discount_factors = include_yield_curve_basis(futurepaytimes, shortrates.get_yield_curve(), discount_curve, timegrid, n, sr_stoch_discount_factors)
@@ -74,7 +78,7 @@ def yoyvalue(notional, spread, discount_curve, timegrid, n, shortrates, futurepa
 
 	if isfloat(notional):
 		notional = float(notional) #make sure it is floating type
-		yoypayments = (future_reset_rates + spread) * notional
+		yoypayments = leverage * (future_reset_rates + spread) * notional
 		yoyvalues = yoypayments * leg_stoch_discount_factors #piecewise multiplication of two matrices with same dimensions 
 
 		#Add notional exchange, unless specified otherwise
@@ -90,7 +94,7 @@ def yoyvalue(notional, spread, discount_curve, timegrid, n, shortrates, futurepa
 		amount_paytimes = len(futurepaytimes)
 		amortizing_notional = amortizing_notional[-amount_paytimes:] #Only take notionals of payments yet to come, now length of amortizing_notional is equal to amount of columns of leg_stoch_discount_factors
 
-		yoypayments = (future_reset_rates + spread) * amortizing_notional
+		yoypayments = leverage * (future_reset_rates + spread) * amortizing_notional
 		yoyvalues = yoypayments * leg_stoch_discount_factors
 		if notionalexchange == 'yes':
 			yoyvalues[:,-1] += amortizing_notional[-1]*leg_stoch_discount_factors[:,-1]
@@ -109,7 +113,6 @@ def yoyinflationpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_di
 		#Determine the right risk driver objects
 		currency = leg_input['Currency'][leg]
 		shortrates = shortrates_dict[currency]
-		fxrates = fxrates_dict[currency]
 		inflationrates = inflationrates_dict[currency]
 
 		#Determine the parameters needed to price
@@ -118,6 +121,7 @@ def yoyinflationpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_di
 		lag = leg_input['Lag'][leg]
 		freq = leg_input['Reset Frequency'][leg]
 		spread = leg_input['Spread'][leg]
+		leverage = leg_input['Leverage'][leg]
 		notional_exchange = leg_input['NotionalExchangeEnd'][leg]
 		notional = leg_input['Notional'][leg]
 	    
@@ -135,6 +139,7 @@ def yoyinflationpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_di
 		stoch_fwd_inflation_index_two = np.zeros((simulation_amount, len(paytimes)))
 		#The first inflation index of one has already been determined in the past and has to be given as an input (lag already included, but this is by default in Bloomberg)
 		stoch_fwd_inflation_index_one[:,0] = base_index_one
+		stoch_fwd_inflation_index_one[:,1] = base_index_two #The second base index must also be included in the first matrix 
 		#The first inflation index of two MAY have alraedy been determined in the past, if not, then it will be overridden in the stoch_fwd_inflation_index function sincen then paytimes[0] - lag > timegrid[0] = 0
 		stoch_fwd_inflation_index_two[:,0] = base_index_two
 		
@@ -146,12 +151,13 @@ def yoyinflationpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_di
 			#determine the future paytimes relative to the point in the simulation
 			future_paytimes = paytimes[paytimes > timegrid[n]]
 			#calculate the stochastic yoy leg values
-			yoyvalues = yoyvalue(notional, spread, discount_curve, timegrid, n, shortrates, future_paytimes, stoch_fwd_inflation_index_one, stoch_fwd_inflation_index_two, notional_exchange)
+			yoyvalues = yoyvalue(notional, spread, leverage, discount_curve, timegrid, n, shortrates, future_paytimes, stoch_fwd_inflation_index_one, stoch_fwd_inflation_index_two, notional_exchange)
 			
 			future_mtm[:,n] = yoyvalues
 
 		#convert with stochastic spot FX to domestic currency if it's a foreign leg
 		if currency != 'domestic':
+			fxrates = fxrates_dict[currency]
 			future_mtm = future_mtm * fxrates_dict[currency].get_simulated_rates()
 
 		net_future_mtm += future_mtm

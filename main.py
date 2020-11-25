@@ -14,8 +14,8 @@ from RiskDriverSimulation import *
 fixedlegs = np.array([]) #Include all fixed-floating swaps you want to include in the netting set
 floatlegs = np.array([]) #Include all fixed-fixed swaps you want to include in the netting set
 cmslegs = np.array([])#np.array([1,2])
-zcinflationlegs = np.array([])
-yoyinflationlegs = np.array([1])
+zcinflationlegs = np.array([1])
+yoyinflationlegs = np.array([])
 swaptiondeals = np.array([]) #Include all swaptions you want to include in the netting set
 
 
@@ -89,6 +89,10 @@ if(num_rows != total or num_cols != total):
 	print("Error: enter correlation matrix with correct dimensions: N x N, with N = amount of risk drivers")
 	exit()
 
+print("The amount of currencies is " + str(iramount))
+print("The amount of fx rates is " + str(fxamount))
+print("The amount of inflation rates is " + str(inflationamount))
+print("The amount of equities is " + str(equityamount))
 #############################################################################
 ########## Monte Carlo Simulation ############
 #############################################################################
@@ -125,7 +129,7 @@ net_future_mtm = np.zeros((simulation_amount, len(timegrid)))
 
 # net_future_mtm = cmslegpricing(cmslegs, net_future_mtm, cmsleginput, timegrid, shortrates, fxrates, simulation_amount)
 
-#net_future_mtm = zcinflationpricing(zcinflationlegs, net_future_mtm, zcinflationleginput, timegrid, shortrates, fxrates, inflationrates, simulation_amount)
+net_future_mtm = zcinflationpricing(zcinflationlegs, net_future_mtm, zcinflationleginput, timegrid, shortrates, fxrates, inflationrates, simulation_amount)
 
 net_future_mtm = yoyinflationpricing(yoyinflationlegs, net_future_mtm, yoyinflationleginput, timegrid, shortrates, fxrates, inflationrates, simulation_amount)
 
