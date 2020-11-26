@@ -1,5 +1,6 @@
 from .riskdrivers import *
 from .generalfunctions import *
+from progressbar import ProgressBar
 
 
 def cms_reset_calc(reset_rates, reset_times, tenor, freq, timegrid, n, shortrates, discount_curve, forward_curve, convexity_adjustment):
@@ -20,7 +21,7 @@ def cms_reset_calc(reset_rates, reset_times, tenor, freq, timegrid, n, shortrate
 
 def cmslegpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_dict, fxrates, simulation_amount):
 	for leg in legs:
-
+		print('Pricing CMS leg ' + str(leg) + 'of total CMS legs ' + str(len(legs)))
 		currency = leg_input['Currency'][leg]
 		freq = leg_input['Freq'][leg]
 		spread = leg_input['Spread'][leg]
@@ -48,7 +49,8 @@ def cmslegpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_dict, fx
 		reset_rates[:,0] = first_rate #First reset rate was determined in the past before valuation date, so needs to be given as input
 		reset_times = paytimes[:-1] #Time schedule at which reset rates are determined. Payment for time at i is determined at i-1, so last payment is removed since all payments are decided from second to last payment
 
-		for n in range(0, len(timegrid[timegrid < maturity])):
+		pbar = ProgressBar()
+		for n in pbar(range(0, len(timegrid[timegrid < maturity]))):
 			futurepaytimes = paytimes[paytimes > timegrid[n]]
 
 			#Calculate stochastic reset rates

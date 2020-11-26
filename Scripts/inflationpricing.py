@@ -1,10 +1,11 @@
 from .riskdrivers import *
 from .generalfunctions import *
+from progressbar import ProgressBar
 
 #Pricing of a ZC inflation leg
 def zcinflationpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_dict, fxrates_dict, inflationrates_dict, simulation_amount):
 	for leg in legs:
-		
+		print('Pricing ZC inflation leg ' + str(leg) + ' of total ZC inflation legs ' + str(len(legs)))
 		#Create empty matrix to fill with future mtms
 		future_mtm = np.zeros((simulation_amount, len(timegrid)))
 
@@ -24,7 +25,8 @@ def zcinflationpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_dic
 		stochastic_inflation_index_starttime = np.ones(simulation_amount).reshape((simulation_amount,1))
 		stochastic_inflation_index_starttime = stochastic_inflation_index_starttime * leg_input['Base Index'][leg]
 
-		for n in range(0, len(timegrid[timegrid < paytime])):
+		pbar = ProgressBar()
+		for n in pbar(range(0, len(timegrid[timegrid < paytime]))):
 		
 			#stochastic spot inflation index, i.e. the inflation index (like RPI) at time = timegrid[n]
 			spot_inflation_index = inflationrates.get_simulated_inflation_index()[:,n].reshape((simulation_amount,1))
@@ -106,7 +108,7 @@ def yoyvalue(notional, spread, leverage, discount_curve, timegrid, n, shortrates
 #Pricing of a Year-on-Year inflation leg
 def yoyinflationpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_dict, fxrates_dict, inflationrates_dict, simulation_amount):
 	for leg in legs:
-
+		print('Pricing yoy inflation leg ' + str(leg) + ' of total yoy inflation legs ' + str(len(legs)))
 		#Create empty matrix to fill with future mtms
 		future_mtm = np.zeros((simulation_amount, len(timegrid)))
 
@@ -144,7 +146,8 @@ def yoyinflationpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_di
 		stoch_fwd_inflation_index_two[:,0] = base_index_two
 		
 		#loop over timegrid
-		for n in range(0, len(timegrid[timegrid < maturity])):
+		pbar = ProgressBar()
+		for n in pbar(range(0, len(timegrid[timegrid < maturity]))):
 			#Calculate the new stochastic forward inflation indices
 			stoch_fwd_inflation_index_one = stoch_fwd_inflation_index(stoch_fwd_inflation_index_one, paytimes_minus_one, timegrid, n, inflationrates, lag)
 			stoch_fwd_inflation_index_two = stoch_fwd_inflation_index(stoch_fwd_inflation_index_two, paytimes, timegrid, n, inflationrates, lag)
@@ -157,7 +160,81 @@ def yoyinflationpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_di
 
 		#convert with stochastic spot FX to domestic currency if it's a foreign leg
 		if currency != 'domestic':
-			fxrates = fxrates_dict[currency]
+			#fxrates = fxrates_dict[currency]
+			future_mtm = future_mtm * fxrates_dict[currency].get_simulated_rates()
+
+		net_future_mtm += future_mtm
+
+	return(net_future_mtm)
+
+def giltvalue(base_index, base_coupon, freq, notional_exchange, notional, discount_curve, stoch_fwd_inflation_indices, timegrid, n, future_paytimes, shortrates):
+	#Calculate the stochastic discount factors on the future paytimes
+	sr_stoch_discount_factors = shortrates.get_stochastic_affine_discount_factors(future_paytimes, n)
+	leg_stoch_discount_factors = include_yield_curve_basis(future_paytimes, shortrates.get_yield_curve(), discount_curve, timegrid, n, sr_stoch_discount_factors)
+
+    #Determine the future stoch fwd inflation indices
+	future_stoch_fwd_inflation_indices = stoch_fwd_inflation_indices[:, (stoch_fwd_inflation_indices.shape[1] - len(future_paytimes)):stoch_fwd_inflation_indices.shape[1]]
+
+	#determine payment values (I_fwd / I_base) * coupon * freq * notional
+	giltpayments = future_stoch_fwd_inflation_indices / base_index * base_coupon * freq * notional 
+	if notional_exchange == 'yes':
+		giltpayments[:,-1] += notional 
+
+    #stochastically discount the payments 
+	giltpaymentspv = giltpayments * leg_stoch_discount_factors
+
+	giltvalues = np.sum(giltpaymentspv, axis=1) #Each row is summed
+
+	return(giltvalues)
+
+
+def giltpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_dict, fxrates_dict, inflationrates_dict, simulation_amount):
+	for leg in legs:
+		print('Pricing gilt leg ' + str(leg) + ' of total gilt legs ' + str(len(legs)))
+		#Create empty matrix to fill with future mtms
+		future_mtm = np.zeros((simulation_amount, len(timegrid)))
+
+		#Determine the right risk driver objects
+		currency = leg_input['Currency'][leg]
+		shortrates = shortrates_dict[currency]
+		inflationrates = inflationrates_dict[currency]
+
+		#Determine the parameters needed to price
+		base_index = leg_input['Base Index'][leg]
+		first_pay_index = leg_input['First Payment Index'][leg]
+		base_coupon = leg_input['Base Coupon'][leg]
+		lag = leg_input['Lag'][leg]
+		freq = leg_input['Reset Frequency'][leg]
+		notional_exchange = leg_input['NotionalExchangeEnd'][leg]
+	   
+		notional = leg_input['Notional'][leg]
+	    
+		discount_curve = pd.read_excel(r'Input/Curves/' + leg_input['Discount Curve'][leg] +  '.xlsx')
+
+		#the paytimes are always assumed equal to reset times (since discounting effect in CVA is negligible compared to reset frequency effect)
+		paytimes = create_payment_times(freq, leg_input['StartDate'][leg], leg_input['EndDate'][leg], leg_input['ValDate'][leg])
+		#maturity in years
+		maturity = paytimes[-1] #Yearfrac of the maturity
+
+		#the stochastic forward inflation indices on the paytimes, the first may have already been determined in the past and has to be given as an input, if it is not given, it will be overridden
+		stoch_fwd_inflation_indices = np.zeros((simulation_amount, len(paytimes)))
+		stoch_fwd_inflation_indices[:,0] = first_pay_index 
+
+		#loop over timegrid
+		pbar = ProgressBar()
+		for n in pbar(range(0, len(timegrid[timegrid < maturity]))):
+			#Calculate the new stochastic forward inflation indices
+			stoch_fwd_inflation_indices = stoch_fwd_inflation_index(stoch_fwd_inflation_indices, paytimes, timegrid, n, inflationrates, lag)
+			#determine the future paytimes relative to the point in the simulation
+			future_paytimes = paytimes[paytimes > timegrid[n]]
+			#calculate the stochastic yoy leg values
+			giltvalues = giltvalue(base_index, base_coupon, freq, notional_exchange, notional, discount_curve, stoch_fwd_inflation_indices, timegrid, n, future_paytimes, shortrates)
+			
+			future_mtm[:,n] = giltvalues
+
+		#convert with stochastic spot FX to domestic currency if it's a foreign leg
+		if currency != 'domestic':
+			#fxrates = fxrates_dict[currency]
 			future_mtm = future_mtm * fxrates_dict[currency].get_simulated_rates()
 
 		net_future_mtm += future_mtm

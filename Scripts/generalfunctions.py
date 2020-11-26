@@ -4,6 +4,7 @@ import datetime
 import math
 import QuantLib as ql #Requires "pip install QuantLib" in Anaconda prompt
 import yearfrac as yf #Requires "pip install yearfrac" in Anaconda prompt
+from progressbar import ProgressBar #Requires "pip install progressbar" in Anaconda prompt
 from scipy import interpolate
 from .riskdrivers import *
 
@@ -383,12 +384,14 @@ def floatvalue(notional, freq, spread, discount_curve, timegrid, n, shortrates, 
 
 def stochastic_discount(net_future_mtm, shortrates_object, timegrid, final_discount_curve):
 	#Integrate short rates using trapezium rule to obtain stochastic discount factors to today
+	print('Stochastically discounting the future MTMs to zero')
 	shortrates = shortrates_object.get_simulated_rates() 
 	net_discounted_mtm = np.zeros((net_future_mtm.shape[0], len(timegrid)))
 	
 	net_discounted_mtm[:,0] = net_future_mtm[:,0]
 
-	for n in range(1, net_discounted_mtm.shape[1]):
+	pbar = ProgressBar() #progressbar is added because this for loop might take some time if small timesteps and/or large simulation amount and/or large maturity
+	for n in pbar(range(1, net_discounted_mtm.shape[1])):
 		new_shortrates = shortrates[:,0:(n+1)]
 		new_timegrid = timegrid[0:n+1]
 		sr_stoch_discount_factors = np.exp(-np.trapz(new_shortrates, new_timegrid))#Numerical integration of short rates with trapezium rule. Returns vector of length = simulation amount
@@ -464,3 +467,7 @@ def stoch_fwd_inflation_index(stoch_fwd_inflation_indices, times, timegrid, n, i
 		#Replace the final columns of the stoch fwd inflation indices with the  newly calculated future stoch fwd inflation rates
 		stoch_fwd_inflation_indices[:, (stoch_fwd_inflation_indices.shape[1] - len(future_times)):stoch_fwd_inflation_indices.shape[1]] = stoch_future_fwd_inflation_indices 
 		return(stoch_fwd_inflation_indices)
+
+
+def collateralize(net_future_mtm, mpor, mta_self, mta_cpty, threshold_self, threshold_cpty, cap_self, cap_cpty):
+	pass

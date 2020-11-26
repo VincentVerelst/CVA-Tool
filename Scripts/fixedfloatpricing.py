@@ -1,11 +1,11 @@
 from .riskdrivers import *
 from .generalfunctions import *
-
+from progressbar import ProgressBar
 
 
 def fixedpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_dict, fxrates, simulation_amount):
 	for leg in legs:
-		
+		print('Pricing fixed leg ' + str(leg) + ' of total fixed legs ' + str(len(legs)))
 		paytimes = create_payment_times(leg_input['Freq'][leg], leg_input['StartDate'][leg], leg_input['EndDate'][leg], leg_input['ValDate'][leg])
 
 		maturity = paytimes[-1] #Yearfrac of the maturity
@@ -26,8 +26,8 @@ def fixedpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_dict, fxr
 
 		
 
-
-		for n in range(0, len(timegrid[timegrid < maturity])):
+		pbar = ProgressBar()
+		for n in pbar(range(0, len(timegrid[timegrid < maturity]))):
 			futurepaytimes = paytimes[paytimes > timegrid[n]]
 
 			fixedvalues = fixedvalue(notional, freq, rate, discount_curve, timegrid, n, shortrates, futurepaytimes, notional_exchange)
@@ -48,7 +48,8 @@ def fixedpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_dict, fxr
 
 def floatpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_dict, fxrates, simulation_amount):
 	for leg in legs:
-		
+		print('Pricing floating leg ' + str(leg) + ' of total floating legs ' + str(len(legs)))
+
 		paytimes = create_payment_times(leg_input['Freq'][leg], leg_input['StartDate'][leg], leg_input['EndDate'][leg], leg_input['ValDate'][leg])
 
 		maturity = paytimes[-1] #Yearfrac of the maturity
@@ -74,7 +75,8 @@ def floatpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_dict, fxr
 		reset_rates[:,0] = first_rate #First reset rate was determined in the past before valuation date, so needs to be given as input
 		reset_times = paytimes[:-1] #Time schedule at which reset rates are determined. Payment for time at i is determined at i-1, so last payment is removed since all payments are decided from second to last payment
 
-		for n in range(0, len(timegrid[timegrid < maturity])):
+		pbar = ProgressBar()
+		for n in pbar(range(0, len(timegrid[timegrid < maturity]))):
 			futurepaytimes = paytimes[paytimes > timegrid[n]]
 
 			#Calculate stochastic reset rates

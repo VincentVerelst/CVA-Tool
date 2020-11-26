@@ -5,7 +5,8 @@ import math
 import matplotlib.pyplot as plt
 import QuantLib as ql #Requires "pip install QuantLib" in Anaconda prompt
 import yearfrac as yf #Requires "pip install yearfrac" in Anaconda prompt
-from RiskDriverSimulation import *
+from progressbar import ProgressBar #Requires "pip install progressbar" in Anaconda prompt
+from Scripts import *
 
 #############################################################################
 ########## User Defined Data ############
@@ -16,6 +17,7 @@ floatlegs = np.array([]) #Include all fixed-fixed swaps you want to include in t
 cmslegs = np.array([])#np.array([1,2])
 zcinflationlegs = np.array([1])
 yoyinflationlegs = np.array([])
+giltlegs = np.array([])
 swaptiondeals = np.array([]) #Include all swaptions you want to include in the netting set
 
 
@@ -30,6 +32,7 @@ floatleginput = pd.read_excel(r'Input/Runfiles/Pricing/floatlegs.xlsx', skiprows
 cmsleginput = pd.read_excel(r'Input/Runfiles/Pricing/cmslegs.xlsx', skiprows=2, index_col=0, parse_dates=['ValDate','StartDate', 'EndDate'], date_parser=dateparse)
 zcinflationleginput = pd.read_excel(r'Input/Runfiles/Pricing/zcinflationlegs.xlsx', skiprows=2, index_col=0, parse_dates=['ValDate','StartDate', 'EndDate'], date_parser=dateparse)
 yoyinflationleginput = pd.read_excel(r'Input/Runfiles/Pricing/yoyinflationlegs.xlsx', skiprows=2, index_col=0, parse_dates=['ValDate','StartDate', 'EndDate'], date_parser=dateparse)
+giltleginput = pd.read_excel(r'Input/Runfiles/Pricing/giltlegs.xlsx', skiprows=2, index_col=0, parse_dates=['ValDate','StartDate', 'EndDate'], date_parser=dateparse)
 
 #Monte Carlo Information
 mcinput = pd.read_excel(r'Input/Runfiles/RiskDriverSimulation/MCDetails.xlsx')
@@ -38,6 +41,10 @@ end_date = mcinput['End Date Netting Set'][0]
 correlation = mcinput['Correlation'][0]
 timesteps = mcinput['Timesteps'][0]
 simulation_amount = mcinput['SimAmount'][0]
+collateralized = mcinput['Collateralized'][0]
+if collateralized == 'yes' and timesteps != 'Daily':
+	print('Please use daily timesteps if the exposure profile is collateralized.')
+	#exit() #REMOVE THIS COMMENT ONCE COLLATERAL FUNCTION IS COMPLETE 
 switcher = {
 	"Yearly": 1,
 	"Quarterly": 0.25,
@@ -89,10 +96,7 @@ if(num_rows != total or num_cols != total):
 	print("Error: enter correlation matrix with correct dimensions: N x N, with N = amount of risk drivers")
 	exit()
 
-print("The amount of currencies is " + str(iramount))
-print("The amount of fx rates is " + str(fxamount))
-print("The amount of inflation rates is " + str(inflationamount))
-print("The amount of equities is " + str(equityamount))
+
 #############################################################################
 ########## Monte Carlo Simulation ############
 #############################################################################
@@ -123,45 +127,77 @@ shortrates, fxrates, inflationrates = ir_fx_simulate(timegrid, simulation_amount
 
 net_future_mtm = np.zeros((simulation_amount, len(timegrid)))
 
-# net_future_mtm = fixedpricing(fixedlegs, net_future_mtm, fixedleginput, timegrid, shortrates, fxrates, simulation_amount)
+net_future_mtm = fixedpricing(fixedlegs, net_future_mtm, fixedleginput, timegrid, shortrates, fxrates, simulation_amount)
 
-# net_future_mtm = floatpricing(floatlegs, net_future_mtm, floatleginput, timegrid, shortrates, fxrates, simulation_amount)
+net_future_mtm = floatpricing(floatlegs, net_future_mtm, floatleginput, timegrid, shortrates, fxrates, simulation_amount)
 
-# net_future_mtm = cmslegpricing(cmslegs, net_future_mtm, cmsleginput, timegrid, shortrates, fxrates, simulation_amount)
+net_future_mtm = cmslegpricing(cmslegs, net_future_mtm, cmsleginput, timegrid, shortrates, fxrates, simulation_amount)
 
 net_future_mtm = zcinflationpricing(zcinflationlegs, net_future_mtm, zcinflationleginput, timegrid, shortrates, fxrates, inflationrates, simulation_amount)
 
 net_future_mtm = yoyinflationpricing(yoyinflationlegs, net_future_mtm, yoyinflationleginput, timegrid, shortrates, fxrates, inflationrates, simulation_amount)
 
-print(net_future_mtm[1,:])
-# # #stochastic discounting to today
-# net_discounted_mtm = stochastic_discount(net_future_mtm, shortrates['domestic'], timegrid, final_discount_curve)
+net_future_mtm = giltpricing(giltlegs, net_future_mtm, giltleginput, timegrid, shortrates, fxrates, inflationrates, simulation_amount)
 
 
-# # # #############################################################################
-# # # ########## Exposure Calculation + Writing to Excel ############
-# # # #############################################################################
-
-# #Expected Exposure
-# EE = np.mean(net_discounted_mtm, axis=0)
-
-# #Expected Positive Exposure
-# PE = net_discounted_mtm.copy()
-# PE[PE < 0] = 0
-# EPE = np.mean(PE, axis=0)
-
-# #Expected Negative Exposure
-# NE = net_discounted_mtm.copy()
-# NE[NE > 0] = 0
-# ENE = np.mean(NE, axis=0)
-
-# #Create a dataframe with all data
-# output = pd.DataFrame({"Tenor [Y]": timegrid, "EE": EE, "EPE": EPE, "ENE":ENE} )
-
-# #Write to Excel
-# output.to_excel("Output/exposures.xlsx")
 
 
-# print(EE[0])
+
+# # #############################################################################
+# # ########## Exposure Calculation + Writing to Excel IF UNCOLLATERALIZED ############
+# # #############################################################################
+
+if collateralized == 'no':
+	# # #stochastic discounting to today
+	net_discounted_mtm = stochastic_discount(net_future_mtm, shortrates['domestic'], timegrid, final_discount_curve)
+
+	#Expected Exposure
+	EE = np.mean(net_discounted_mtm, axis=0)
+
+	#Expected Positive Exposure
+	PE = net_discounted_mtm.copy()
+	PE[PE < 0] = 0
+	EPE = np.mean(PE, axis=0)
+
+	#Expected Negative Exposure
+	NE = net_discounted_mtm.copy()
+	NE[NE > 0] = 0
+	ENE = np.mean(NE, axis=0)
+
+	#Create a dataframe with all data
+	output = pd.DataFrame({"Tenor [Y]": timegrid, "EE": EE, "EPE": EPE, "ENE":ENE} )
+
+	#Write to Excel
+	output.to_excel("Output/exposures.xlsx")
 
 
+	
+
+
+# # #############################################################################
+# # ########## Exposure Calculation + Writing to Excel IF COLLATERALIZED ############
+# # #############################################################################
+
+if collateralized == 'yes':
+	#Marginal Period of Risk
+	mpor = round(10 *(365/252))#convert business days to calender days
+	#Define all CSA details (all expressed in valuation currency)
+	threshold_cpty = 0 #Counterparty posting threshold
+	threshold_self = 0 #Own posting threshold 
+	mta_cpty = 0 #Counterparty Minimum Transfer Amount 
+	mta_self = 0 #Own Minimum Transfer Amount
+	cap_cpty = math.inf #Counterparty Maximum Transfer Amount, IF THIS IS NOT GIVEN: set equal to Inf (= infinity, because CAP of zero will give always zero coll of course)
+	cap_self = math.inf #Own Maximum Transfer Amount
+
+	col_net_future_mtm = collateralize(net_future_mtm, mpor, mta_self, mta_cpty, threshold_self, threshold_cpty, cap_self, cap_cpty)
+
+# # #############################################################################
+# # ########## Print some useful information for checks ############
+# # #############################################################################
+
+print("The amount of currencies is " + str(iramount))
+print("The amount of fx rates is " + str(fxamount))
+print("The amount of inflation rates is " + str(inflationamount))
+print("The amount of equities is " + str(equityamount))
+
+#print('Simulated MTM is ' + str(EE[0]) + ' ' + str(irinput['domestic'][0]))
