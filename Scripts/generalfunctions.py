@@ -469,5 +469,83 @@ def stoch_fwd_inflation_index(stoch_fwd_inflation_indices, times, timegrid, n, i
 		return(stoch_fwd_inflation_indices)
 
 
-def collateralize(net_future_mtm, mpor, mta_self, mta_cpty, threshold_self, threshold_cpty, cap_self, cap_cpty):
-	pass
+def collateralize(net_future_mtm, mpor, call_frequency, mta_self, mta_cpty, threshold_self, threshold_cpty, cap_self, cap_cpty, collateral_currency, fxrates_dict):
+	#we know the net future mtm at every time t in the timegrid (V(t)), now we determine the stochastic future collateral balance at every time t in the timegrid (C(t))
+	#The exposure is then equal to the difference between net future mtm and stochastic future collateral balance: Exposure = V(t) - C(t) 
+	collateral_balance = np.zeros((net_future_mtm.shape[0], net_future_mtm.shape[1]))
+	collateral_balance[:,0] = net_future_mtm[:,0] #assume at time zero that the netting set is fully collateralized
+	
+	#Step 1: add caps and thresholds of the collateral
+
+	#create matrices of the caps and thresholds and convert them to the domestic currency if collateral is in different ccy
+	zeros_matrix = np.zeros((net_future_mtm.shape[0], net_future_mtm.shape[1])) #same dimensions as net_future_mtm
+	ones_matrix = np.ones((net_future_mtm.shape[0], net_future_mtm.shape[1])) #same dimensions as net_future_mtm
+
+	mta_self_matrix = ones_matrix * mta_self
+	mta_cpty_matrix = ones_matrix * mta_cpty
+	threshold_self_matrix = ones_matrix * threshold_self
+	threshold_cpty_matrix = ones_matrix * threshold_cpty 
+	cap_self_matrix = ones_matrix * cap_self
+	cap_cpty_matrix = ones_matrix * cap_cpty
+
+	#convert to domestic currency if collateral is in different ccy with stochastic spot FX rates
+	if collateral_currency != 'domestic':
+		fxrates = fx_rates_dict[collateral_currency].get_simulated_rates()
+
+		mta_self_matrix *= fxrates
+		mta_cpty_matrix *= fxrates
+		threshold_self_matrix *= fxrates
+		threshold_cpty_matrix *= fxrates
+		cap_self_matrix *= fxrates
+		cap_cpty_matrix *= fxrates 
+
+	#min(max(V(t) - threshold_cpty; 0); cap_cpty) immediately eliminates all negative mtm's, so in this situation counterparty has to post collateral subject to its cap and threshold
+	#max(min(V(t) + treshold_self;0); -cap_self) immediately all positive mtm's, so in this situation self has to post collateral. Taking into account signs. E.g. cap is 500 USD and MTM is -600USD then max(-600, -500) must be taken
+	capped_floored_net_future_mtm = np.minimum(np.maximum(net_future_mtm - threshold_cpty_matrix, zeros_matrix), cap_cpty_matrix) + np.maximum(np.minimum(net_future_mtm + threshold_self_matrix, zeros_matrix), -cap_self_matrix)
+
+	#Step 2: take into account MTA (minimum transfer amount) and call frequency: has to be done stepwise
+	
+	for n in range(1, net_future_mtm.shape[1]):
+		#check if it is a collateral call date (i.e. if n is divisble by call_frequency)
+		if n % call_frequency == 0:
+			collateral_balance[:,n] = collateral_balance[:, n-1]
+			#determine difference between collateral balance and capped_floored_mtm
+			delta_collateral = capped_floored_net_future_mtm[:,n] - collateral_balance[:,n] #collateral balance n at this point is still equal to the collateral balance as it was posted on previous call date
+			#If delta_collateral is positive, then counterparty must post if delta is larger than its MTA
+			positive_delta_collateral = delta_collateral.copy()
+			positive_delta_collateral[positive_delta_collateral < 0] = 0
+			temp_mta_cpty = mta_cpty_matrix[:,n]
+			positive_delta_collateral[positive_delta_collateral < temp_mta_cpty] = 0 #if delta is smaller than MTA then there is no delta (i.e. no collateral posting)
+			#Negative delta, means MTM has dropped, so we have to post collateral, but only post it when the drop is larger than our own MTA
+			negative_delta_collateral = delta_collateral.copy()
+			negative_delta_collateral[negative_delta_collateral > 0] = 0
+			temp_mta_self = mta_self_matrix[:,n]
+			negative_delta_collateral[negative_delta_collateral > -temp_mta_self] = 0
+
+			#Add the postive and the negative back together
+			mta_delta_collateral = positive_delta_collateral + negative_delta_collateral 
+			collateral_balance[:,n] = collateral_balance[:,n] + mta_delta_collateral
+		#if not a collateral call date, then collateral balance doesn't change
+		else:
+			collateral_balance[:,n] = collateral_balance[:, n-1]
+
+	#Step 3: take into account the MPOR
+
+	#If there is an MPOR add a 'delay' to the collateral balance of MPOR amount of days
+	if mpor > 0:
+		mtm_matrix = np.ones((net_future_mtm.shape[0], mpor))
+		mtm_matrix *= net_future_mtm[0,0] 
+		#first mpor columns of the collateral balance are now equal to the original MTM
+		shifted_collateral_balance = np.append(mtm_matrix, collateral_balance, axis=1)
+
+		#last mpor columns of the collateral balance are not needed and are removed 
+		shifted_collateral_balance = np.delete(shifted_collateral_balance, np.s_[(shifted_collateral_balance.shape[1] - mpor):shifted_collateral_balance.shape[1]] , axis=1)
+
+	else:
+		shifted_collateral_balance = collateral_balance.copy()
+
+
+	#Final exposure is net_future_mtm minus the collateral balance (shifted with mpor days)
+	collateral_exposure = net_future_mtm - shifted_collateral_balance 
+
+	return(collateral_exposure)
