@@ -3,6 +3,7 @@ from .generalfunctions import *
 from progressbar import ProgressBar
 
 
+#Calculate a matrix of convexity adjustment CMS rates (same principle as stochastic floating rate matrix)
 def cms_reset_calc(reset_rates, reset_times, tenor, freq, timegrid, n, shortrates, discount_curve, forward_curve, convexity_adjustment):
 	future_reset_times = reset_times[reset_times > timegrid[n]]
 	convexityfun = interpolate.interp1d(convexity_adjustment['TimeToZero'], convexity_adjustment['Convexity'], 'linear', fill_value='extrapolate') #linear interpolation of the zero rate
@@ -19,6 +20,8 @@ def cms_reset_calc(reset_rates, reset_times, tenor, freq, timegrid, n, shortrate
 
 		return(reset_rates)
 
+
+#Pricing of a CMS leg 
 def cmslegpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_dict, fxrates, simulation_amount):
 	for leg in legs:
 		print('Pricing CMS leg ' + str(leg) + 'of total CMS legs ' + str(len(legs)))
@@ -56,6 +59,7 @@ def cmslegpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_dict, fx
 			#Calculate stochastic reset rates
 			reset_rates = cms_reset_calc(reset_rates, reset_times, tenor, forward_curve_freq, timegrid, n, shortrates, discount_curve_swaprate, forward_curve_swaprate, convexity_adjustment)
 
+			#once the reset rates (= convexity adjusted forward CMS rates) have been determined, the pricing of the leg is identical to that of a floating leg
 			cmsvalues = floatvalue(notional, freq, spread, discount_curve_leg, timegrid, n, shortrates, futurepaytimes, reset_rates, notional_exchange)
 
 			future_mtm[:,n] = cmsvalues
@@ -65,5 +69,34 @@ def cmslegpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_dict, fx
 			future_mtm = future_mtm * fxrates[currency].get_simulated_rates()
 
 		net_future_mtm += future_mtm
+
+	return(net_future_mtm)
+
+
+#Pricing of a CMS spread cap/floor: payoff = max(X - strike;0) if cap, max(strike - X;0) if floor, with X = CMS spread
+def cmsspreadcapfloorpricing(legs, net_future_mtm, leg_input, timegrid, shortrates_dict, fxrates, simulation_amount):
+	for leg in legs:
+		print('Pricing CMS cap/floor leg ' + str(leg) + 'of total CMS legs ' + str(len(legs)))
+
+		#load in all parameters
+		currency = leg_input['Currency'][leg]
+		freq = leg_input['Freq'][leg]
+		swap_tenor_one = leg_input['SwapTenorOne'][leg] #If the spread is CMS_X - CMS_Y this is X
+		first_reset_rate_one = leg_input['FirstResetRateOne'][leg] 
+		convexity_adjustment_one = pd.read_excel(r'Input/Convexity/' + leg_input['ConvexityOne'][leg] +  '.xlsx')
+		swap_tenor_two = leg_input['SwapTenorTwo'][leg] #If the spread is CMS_X - CMS_Y this is Y
+		first_reset_rate_two = leg_input['FirstResetRateTwo'][leg] 
+		convexity_adjustment_two = pd.read_excel(r'Input/Convexity/' + leg_input['ConvexityTwo'][leg] +  '.xlsx')
+		strike = leg_input['Strike'][leg]
+		leverage = leg_input['Leverage'][leg]
+		spread = leg_input['Spread'][leg]
+		forward_curve_swaprate = pd.read_excel(r'Input/Curves/' + leg_input['Forward Curve Swaprate'][leg] +  '.xlsx')
+		forward_curve_freq = leg_input['Forward Curve Freq'][leg]
+		discount_curve_swaprate = pd.read_excel(r'Input/Curves/' + leg_input['Discount Curve Swaprate'][leg] +  '.xlsx')
+		discount_curve_leg = pd.read_excel(r'Input/Curves/' + leg_input['Discount Curve Leg'][leg] +  '.xlsx')
+		normal_volatility = leg_input['NormalVol'][leg]
+		notional = leg_input['Notional'][leg]
+		cap_floor_flag = leg_input['CapOrFloor'][leg]
+
 
 	return(net_future_mtm)

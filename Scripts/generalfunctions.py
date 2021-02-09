@@ -14,6 +14,10 @@ def better_yearfrac(x, y):
 		return(yf.yearfrac(x,y))
 	else:
 		return(-1*yf.yearfrac(y,x))
+
+#Function to check if matrix is symmetric (as an input check)
+def check_symmetric(a, rtol=1e-05, atol=1e-08):
+    return np.allclose(a, a.T, rtol=rtol, atol=atol)
 #Function to check if a matrix is positive definite (which is a requirement for Cholesky decomposition)
 def is_positive_definite(x):
 	return np.all(np.linalg.eigvals(x) > 0) #All eigenvalues must be larger than zero 
@@ -22,7 +26,7 @@ def is_positive_definite(x):
 def _getAplus(A):
     eigval, eigvec = np.linalg.eig(A)
     Q = np.matrix(eigvec)
-    xdiag = np.matrix(np.diag(np.maximum(eigval, 0)))
+    xdiag = np.matrix(np.diag(np.maximum(eigval, 0.00001)))
     return Q*xdiag*Q.T
 
 def _getPs(A, W=None):
@@ -239,7 +243,7 @@ def mc_simulate_hwbs(irdrivers, fxdrivers, inflationdrivers, equitydrivers, corr
 	for i in range(0, n_totaldrivers):
 		rand_matrix = np.zeros((simulation_amount, len(timegrid)))
 		for j in range(0, n_totaldrivers):
-			rand_matrix += random_matrices[j] * cholesky_correlationmatrix[i][j]
+			rand_matrix += random_matrices[j] * cholesky_correlationmatrix[i,j]
 		correlated_random_matrices.append(rand_matrix)
 
 	return(cholesky_correlationmatrix, correlated_random_matrices)
@@ -469,7 +473,7 @@ def stoch_fwd_inflation_index(stoch_fwd_inflation_indices, times, timegrid, n, i
 		return(stoch_fwd_inflation_indices)
 
 
-def collateralize(net_future_mtm, mpor, call_frequency, mta_self, mta_cpty, threshold_self, threshold_cpty, cap_self, cap_cpty, collateral_currency, fxrates_dict):
+def collateralize(net_future_mtm, mpor, call_frequency, mta_self, mta_cpty, threshold_self, threshold_cpty, cap_self, cap_cpty, collateral_currency, fx_rates_dict):
 	#we know the net future mtm at every time t in the timegrid (V(t)), now we determine the stochastic future collateral balance at every time t in the timegrid (C(t))
 	#The exposure is then equal to the difference between net future mtm and stochastic future collateral balance: Exposure = V(t) - C(t) 
 	collateral_balance = np.zeros((net_future_mtm.shape[0], net_future_mtm.shape[1]))
