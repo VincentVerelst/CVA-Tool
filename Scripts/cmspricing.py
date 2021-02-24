@@ -13,7 +13,7 @@ def cms_reset_calc(reset_rates, reset_times, tenor, freq, timegrid, n, shortrate
 	
 	else:
 		convexity = np.array(convexityfun(future_reset_times))
-		stoch_forward_rates = atm_swap_rate(future_reset_times, tenor, timegrid, n, 1, freq, shortrates, discount_curve, shortrates, forward_curve, discount_curve)
+		stoch_forward_rates = atm_swap_rate(future_reset_times, tenor, timegrid, n, 0.5, freq, shortrates, discount_curve, shortrates, forward_curve, discount_curve)
 		#add deterministic convexity adjustment
 		stoch_reset_rates = stoch_forward_rates + convexity #convexity is a vector, so automatically each row of stoch_forward_rates will be added with this vector (length of vectir is equal to amount of columns of stoch_forward_rates)
 		reset_rates[:, (reset_rates.shape[1] - len(future_reset_times)):reset_rates.shape[1]] = stoch_reset_rates #replace final columns of reset rates with the new stoch forward rates
@@ -98,5 +98,58 @@ def cmsspreadcapfloorpricing(legs, net_future_mtm, leg_input, timegrid, shortrat
 		notional = leg_input['Notional'][leg]
 		cap_floor_flag = leg_input['CapOrFloor'][leg]
 
+		switcher = {"cap":"call", "floor":"put"}
+		call_put_flag = switcher[cap_floor_flag]
+	
+
+		#create payment schedule
+		paytimes = create_payment_times(leg_input['Freq'][leg], leg_input['StartDate'][leg], leg_input['EndDate'][leg], leg_input['ValDate'][leg])
+		maturity = paytimes[-1]
+		#Create empty matrix to fill with future mtms
+		future_mtm = np.zeros((simulation_amount, len(timegrid)))
+
+		#Determine the right short rate object
+		shortrates = shortrates_dict[currency] #Take shortrates object from list for which the name equals to the right currency
+
+		#Initiate stochastic reset rate matrices for the two CMS tenors
+		reset_rates_one = np.zeros((simulation_amount, len(paytimes)))
+		reset_rates_one[:,0] = first_reset_rate_one #First reset rate was determined in the past before valuation date, so needs to be given as input
+		
+		reset_rates_two = np.zeros((simulation_amount, len(paytimes)))
+		reset_rates_two[:,0] = first_reset_rate_two #First reset rate was determined in the past before valuation date, so needs to be given as input
+
+		reset_times = paytimes[:-1] #Time schedule at which reset rates are determined. Payment for time at i is determined at i-1, so last payment is removed since all payments are decided from second to last payment
+
+		#this is where the real pricing happens
+		pbar = ProgressBar()
+		for n in pbar(range(0, len(timegrid[timegrid < maturity]))):
+			futurepaytimes = paytimes[paytimes > timegrid[n]]
+
+			#Calculate the stochastic discount factors on the future paytimes
+			sr_stoch_discount_factors = shortrates.get_stochastic_affine_discount_factors(futurepaytimes, n)
+			leg_stoch_discount_factors = include_yield_curve_basis(futurepaytimes, shortrates.get_yield_curve(), discount_curve_leg, timegrid, n, sr_stoch_discount_factors)
+			
+			#Calculate stochastic reset rates
+			reset_rates_one = cms_reset_calc(reset_rates_one, reset_times, swap_tenor_one, forward_curve_freq, timegrid, n, shortrates, discount_curve_swaprate, forward_curve_swaprate, convexity_adjustment_one)
+
+			reset_rates_two = cms_reset_calc(reset_rates_two, reset_times, swap_tenor_two, forward_curve_freq, timegrid, n, shortrates, discount_curve_swaprate, forward_curve_swaprate, convexity_adjustment_two)
+
+			#Only future reset rates are needed
+			future_reset_rates_one = reset_rates_one[:, (reset_rates_one.shape[1] - len(futurepaytimes)):reset_rates_one.shape[1]]
+			future_reset_rates_two = reset_rates_two[:, (reset_rates_two.shape[1] - len(futurepaytimes)):reset_rates_two.shape[1]]
+
+			future_forward_cms_spreads = leverage * (future_reset_rates_one - future_reset_rates_two + spread)
+
+			caplet_floorlet_values = bachelier_model_call_put_price(futurepaytimes, future_forward_cms_spreads, strike, normal_volatility, timegrid, n, leg_stoch_discount_factors, call_put_flag)
+			
+			cap_floor_values = np.sum(caplet_floorlet_values, axis=1) * notional
+
+			future_mtm[:,n] = cap_floor_values
+
+	#convert with stochastic spot FX to domestic currency if it's a foreign leg
+		if currency != 'domestic':
+			future_mtm = future_mtm * fxrates[currency].get_simulated_rates()
+
+		net_future_mtm += future_mtm
 
 	return(net_future_mtm)

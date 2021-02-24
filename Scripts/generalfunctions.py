@@ -6,6 +6,7 @@ import QuantLib as ql #Requires "pip install QuantLib" in Anaconda prompt
 import yearfrac as yf #Requires "pip install yearfrac" in Anaconda prompt
 from progressbar import ProgressBar #Requires "pip install progressbar" in Anaconda prompt
 from scipy import interpolate
+from scipy.stats import norm
 from .riskdrivers import *
 
 def better_yearfrac(x, y):
@@ -452,6 +453,27 @@ def atm_swap_rate(times, tenor, timegrid, n, fixed_freq, float_freq, shortrates_
 
 	return(atm_rates)
 
+def bachelier_model_call_put_price(futurepaytimes, future_forward_matrix, strike, volatility, timegrid, n, stoch_discount_factors, call_put_flag):
+	#converts matrix future_forward_matrix, which consists of stochastic forward rates on the futurepaytimes (per row, so amount of columns equals length of futurepayimtes)
+	#into a matrix containing the stochastic pv of a call/put with forward equal to the forward in the matrix and strike equal to strike
+	#the bachelier model is used which allows for negative forward rates
+
+	#compute factors needed in the Bachelier formula
+	times_to_maturity = futurepaytimes - timegrid[n]
+	volatility_vector = volatility * np.sqrt(times_to_maturity)
+	d_factor = (future_forward_matrix - strike) / volatility_vector
+
+	if call_put_flag == 'call':
+		future_caplet_floorlet_values = (future_forward_matrix - strike) * norm.cdf(d_factor) + volatility_vector * norm.pdf(d_factor)
+
+	elif call_put_flag == 'put':
+		future_caplet_floorlet_values = (strike - future_forward_matrix) * norm.cdf(-d_factor) + volatility_vector * norm.pdf(d_factor)
+	else:
+		print("call_put_flag has to be 'call' or 'put' ")
+
+	caplet_floorlet_values = future_caplet_floorlet_values * stoch_discount_factors
+
+	return(caplet_floorlet_values)
 
 def stoch_fwd_inflation_index(stoch_fwd_inflation_indices, times, timegrid, n, inflationrates, lag):
 	#stoch_inflation_indeces has amount of columns equal to length(times)

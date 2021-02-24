@@ -15,7 +15,7 @@ from Scripts import *
 fixedlegs = np.array([]) #Include all fixed-floating swaps you want to include in the netting set
 floatlegs = np.array([]) #Include all fixed-fixed swaps you want to include in the netting set
 cmslegs = np.array([])#np.array([1,2])
-cmsspreadcapfloorlegs = np.array([1])
+cmsspreadcapfloorlegs = np.array([2])
 zcinflationlegs = np.array([])
 yoyinflationlegs = np.array([])
 giltlegs = np.array([])
@@ -148,7 +148,7 @@ net_future_mtm = giltpricing(giltlegs, net_future_mtm, giltleginput, timegrid, s
 
 
 
-
+print(net_future_mtm[0,0])
 
 # # # #############################################################################
 # # # ########## Exposure Calculation IF UNCOLLATERALIZED ############
