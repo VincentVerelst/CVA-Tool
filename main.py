@@ -148,73 +148,72 @@ net_future_mtm = giltpricing(giltlegs, net_future_mtm, giltleginput, timegrid, s
 
 
 
-print(net_future_mtm[0,0])
 
-# # # #############################################################################
-# # # ########## Exposure Calculation IF UNCOLLATERALIZED ############
-# # # #############################################################################
+# # #############################################################################
+# # ########## Exposure Calculation IF UNCOLLATERALIZED ############
+# # #############################################################################
 
-# if collateralized == 'no':
-# 	# # #stochastic discounting to today
-# 	net_discounted_mtm = stochastic_discount(net_future_mtm, shortrates['domestic'], timegrid, final_discount_curve)
+if collateralized == 'no':
+	# # #stochastic discounting to today
+	net_discounted_mtm = stochastic_discount(net_future_mtm, shortrates['domestic'], timegrid, final_discount_curve)
 
 	
 
 
-# 	# # #############################################################################
-# # # ########## Exposure Calculation IF COLLATERALIZED ############
-# # # #############################################################################
+	# # #############################################################################
+# # ########## Exposure Calculation IF COLLATERALIZED ############
+# # #############################################################################
 
-# if collateralized == 'yes':
-# 	#Marginal Period of Risk
-# 	mpor = 10 #expressed in business days
-# 	#Define all CSA details (all expressed in collateral currenc, if collateral ccy != valuation ccy then CSA features are transfere)
-# 	collateral_currency = 'domestic' #name of the currency as defined in the rates, so 'domestic', 'foreign1', 'foreign2', ...
-# 	call_frequency = 1 #expressed in business days
-# 	threshold_cpty = 0 #Counterparty posting threshold
-# 	threshold_self = 0 #Own posting threshold 
-# 	mta_cpty = 0 #Counterparty Minimum Transfer Amount 
-# 	mta_self = 0 #Own Minimum Transfer Amount
-# 	cap_cpty = math.inf #Counterparty Maximum Transfer Amount, IF THIS IS NOT GIVEN: set equal to math.inf (= infinity, because CAP of zero will give always zero coll of course)
-# 	cap_self = math.inf #Own Maximum Transfer Amount
+if collateralized == 'yes':
+	#Marginal Period of Risk
+	mpor = 10 #expressed in business days
+	#Define all CSA details (all expressed in collateral currenc, if collateral ccy != valuation ccy then CSA features are transfere)
+	collateral_currency = 'domestic' #name of the currency as defined in the rates, so 'domestic', 'foreign1', 'foreign2', ...
+	call_frequency = 1 #expressed in business days
+	threshold_cpty = 0 #Counterparty posting threshold
+	threshold_self = 0 #Own posting threshold 
+	mta_cpty = 0 #Counterparty Minimum Transfer Amount 
+	mta_self = 0 #Own Minimum Transfer Amount
+	cap_cpty = math.inf #Counterparty Maximum Transfer Amount, IF THIS IS NOT GIVEN: set equal to math.inf (= infinity, because CAP of zero will give always zero coll of course)
+	cap_self = math.inf #Own Maximum Transfer Amount
 
-# 	col_net_future_mtm = collateralize(net_future_mtm, mpor, call_frequency, mta_self, mta_cpty, threshold_self, threshold_cpty, cap_self, cap_cpty, collateral_currency, fxrates)
+	col_net_future_mtm = collateralize(net_future_mtm, mpor, call_frequency, mta_self, mta_cpty, threshold_self, threshold_cpty, cap_self, cap_cpty, collateral_currency, fxrates)
 
-# 	net_discounted_mtm = stochastic_discount(col_net_future_mtm, shortrates['domestic'], timegrid, final_discount_curve) #stochastically discount the collateralized exposure to zero
+	net_discounted_mtm = stochastic_discount(col_net_future_mtm, shortrates['domestic'], timegrid, final_discount_curve) #stochastically discount the collateralized exposure to zero
 
-# # # #############################################################################
-# # # ########## Write to Excel ############
-# # # #############################################################################
+# # #############################################################################
+# # ########## Write to Excel ############
+# # #############################################################################
 
-# #Expected Exposure
-# EE = np.mean(net_discounted_mtm, axis=0)
+#Expected Exposure
+EE = np.mean(net_discounted_mtm, axis=0)
 
-# #Expected Positive Exposure
-# PE = net_discounted_mtm.copy()
-# PE[PE < 0] = 0
-# EPE = np.mean(PE, axis=0)
+#Expected Positive Exposure
+PE = net_discounted_mtm.copy()
+PE[PE < 0] = 0
+EPE = np.mean(PE, axis=0)
 
-# #Expected Negative Exposure
-# NE = net_discounted_mtm.copy()
-# NE[NE > 0] = 0
-# ENE = np.mean(NE, axis=0)
+#Expected Negative Exposure
+NE = net_discounted_mtm.copy()
+NE[NE > 0] = 0
+ENE = np.mean(NE, axis=0)
 
-# #Create a dataframe with all data
-# output = pd.DataFrame({"Tenor [Y]": timegrid, "EE": EE, "EPE": EPE, "ENE":ENE} )
+#Create a dataframe with all data
+output = pd.DataFrame({"Tenor [Y]": timegrid, "EE": EE, "EPE": EPE, "ENE":ENE} )
 
-# #Write to Excel
-# output.to_excel("Output/exposures.xlsx")
+#Write to Excel
+output.to_excel("Output/exposures.xlsx")
 
-# # # #############################################################################
-# # # ########## Print some useful information for checks ############
-# # # #############################################################################
+# # #############################################################################
+# # ########## Print some useful information for checks ############
+# # #############################################################################
 
-# print("The amount of currencies is " + str(iramount))
-# print("The amount of fx rates is " + str(fxamount))
-# print("The amount of inflation rates is " + str(inflationamount))
-# print("The amount of equities is " + str(equityamount))
+print("The amount of currencies is " + str(iramount))
+print("The amount of fx rates is " + str(fxamount))
+print("The amount of inflation rates is " + str(inflationamount))
+print("The amount of equities is " + str(equityamount))
 
-# print('Simulated MTM is ' + str(net_future_mtm[0,0]) + ' ' + str(irinput['domestic'][0]))
+print('Simulated MTM is ' + str(net_future_mtm[0,0]) + ' ' + str(irinput['domestic'][0]))
 
 
 
