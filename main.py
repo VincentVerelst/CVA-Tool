@@ -61,29 +61,29 @@ if maturity_yearfrac not in timegrid:
 	timegrid = np.append(timegrid, maturity_yearfrac)
 
 #Read in rates
-irinput = pd.read_excel(r'Input/Runfiles/RiskDriverSimulation/IRinput.xlsx')
+irinput = pd.read_excel(r'Input/Runfiles/RiskDriverSimulation/IRinput.xlsx', index_col=0)
 irinput = irinput.dropna(1, how='all') #Drops all columns with NA values
-irinput = irinput.drop(irinput.columns[0], axis=1) #Drops first column
+#irinput = irinput.drop(irinput.columns[0], axis=1) #Drops first column
 iramount = irinput.count(1)[0] #Count the amount of currencies
 final_discount_curve = pd.read_excel(r'Input/Curves/' + irinput['domestic'][4] + '.xlsx') #Curve with which final future_mtms are discounted with to today
 
 #Read in FX
-fxinput = pd.read_excel(r'Input/Runfiles/RiskDriverSimulation/FXinput.xlsx')
+fxinput = pd.read_excel(r'Input/Runfiles/RiskDriverSimulation/FXinput.xlsx', index_col=0)
 fxinput = fxinput.dropna(1, how='all') #Drops all columns with NA values
-fxinput = fxinput.drop(fxinput.columns[0], axis=1) #Drops first column
+#fxinput = fxinput.drop(fxinput.columns[0], axis=1) #Drops first column
 fxamount = fxinput.count(1)[0] #Count the amount of currencies
 if(fxamount != iramount - 1):
 	print("Error: amount of FX rates must be one less than amount of interest rates.")
 	exit()
 
 #Read in inflation (which is a combo of rates and FX)
-inflationinput = pd.read_excel(r'Input/Runfiles/RiskDriverSimulation/InflationInput.xlsx')
-inflationinput = inflationinput.drop(inflationinput.columns[0], axis=1) #Drops first column
+inflationinput = pd.read_excel(r'Input/Runfiles/RiskDriverSimulation/InflationInput.xlsx', index_col=0)
+#inflationinput = inflationinput.drop(inflationinput.columns[0], axis=1) #Drops first column
 inflationinput = inflationinput.dropna(1, how='all') #Drops all columns with NA values
 inflationamount = inflationinput.count(1)[0] #Count the amount of currencies
 
-equityinput = pd.read_excel(r'Input/Runfiles/RiskDriverSimulation/EquityInput.xlsx')
-equityinput = equityinput.drop(equityinput.columns[0], axis=1) #Drops first column
+equityinput = pd.read_excel(r'Input/Runfiles/RiskDriverSimulation/EquityInput.xlsx', index_col=0)
+#equityinput = equityinput.drop(equityinput.columns[0], axis=1) #Drops first column
 equityinput = equityinput.dropna(1, how='all') #Drops all columns with NA values
 equityamount = equityinput.count(1)[0] #Count the amount of currencies
 

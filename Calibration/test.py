@@ -5,12 +5,14 @@ from scipy.stats import norm
 from scipy.optimize import fsolve
 import scipy.optimize
 
-def f(a, b, x):
-	return a * np.power(x,2) + b
+x = np.arange(1, 3+1, 1)
 
+y = np.ones([3,3])
+z = np.inf
 
-new_f = lambda x: np.power(np.abs(f(1,-4,x)),2) #take square of function and minimize it = same as finding root
+print(z>1e20)
+print(x*y)
 
-minf = scipy.optimize.fmin(new_f, -2)
+z = np.zeros(1)
 
-print(minf[0])
+print(hasattr(z, "__len__"))
